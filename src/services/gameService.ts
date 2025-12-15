@@ -162,8 +162,90 @@ export const gameService = {
     },
 
     async nextTurn(gameId: string) {
-        // Logic for moving to next player
-        // This will be implemented fully in next step, needing `runTransaction` or careful reading
+        const gameRef = ref(db, `games/${gameId}`);
+        const { GAME_SETTINGS } = await import("@/lib/constants");
+
+        await import("firebase/database").then(({ runTransaction }) => {
+            runTransaction(gameRef, (game) => {
+                if (!game) return null;
+
+                // Logic to pick next player
+                const players = game.players || {};
+                const activeIds = Object.keys(players).filter(id => players[id].isActive);
+
+                if (activeIds.length < 2) {
+                    game.status = "PAUSED";
+                    game.currentPlayerId = null;
+                    return game;
+                }
+
+                let nextBag = game.turnBag || [];
+
+                // If bag is empty or invalid, refill
+                if (!Array.isArray(nextBag) || nextBag.length === 0) {
+                    // Refill with all active players
+                    nextBag = activeIds.sort(() => Math.random() - 0.5);
+
+                    // Continuity check: Don't let same player go twice if possible
+                    if (game.currentPlayerId && nextBag[0] === game.currentPlayerId && nextBag.length > 1) {
+                        // Swap first and second
+                        [nextBag[0], nextBag[1]] = [nextBag[1], nextBag[0]];
+                    }
+                }
+
+                // Filter out any players in the bag who might have disconnected since shuffle
+                nextBag = nextBag.filter((id: string) => players[id]?.isActive);
+
+                // If filtering emptied it again, just recurse-ish (or fail safe)
+                if (nextBag.length === 0) {
+                    // Emergency refill
+                    nextBag = activeIds.sort(() => Math.random() - 0.5);
+                }
+
+                const nextPlayerId = nextBag.shift();
+
+                game.currentPlayerId = nextPlayerId;
+                game.turnBag = nextBag;
+                game.lastPlayerId = game.currentPlayerId;
+                game.timerStartedAt = Date.now();
+
+                // Reset timer duration (could be dynamic in future)
+                game.timer = game.settings?.turnTimeLimit || 30;
+
+                return game;
+            });
+        });
+    },
+
+    async submitWords(gameId: string, playerId: string, text: string) {
+        const { v4: uuidv4 } = await import("uuid");
+
+        // 1. Add story segment
+        // We use runTransaction on the story array to safely append
+        const storyRef = ref(db, `games/${gameId}/story`);
+        // Snapshot to get current player color
+        const playerRef = ref(db, `games/${gameId}/players/${playerId}`);
+        const playerSnap = await get(playerRef);
+        const playerColor = playerSnap.exists() ? playerSnap.val().color : "#000000";
+
+        await import("firebase/database").then(({ runTransaction }) => {
+            runTransaction(storyRef, (story) => {
+                if (!story) story = [];
+
+                story.push({
+                    id: uuidv4(),
+                    text: text,
+                    authorId: playerId,
+                    color: playerColor,
+                    timestamp: Date.now()
+                });
+
+                return story;
+            });
+        });
+
+        // 2. Advance turn
+        await this.nextTurn(gameId);
     },
 
     async leaveGame(gameId: string, playerId: string) {

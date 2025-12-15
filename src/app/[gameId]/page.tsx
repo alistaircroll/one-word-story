@@ -165,10 +165,31 @@ function LobbyView({ gameId, gameState }: { gameId: string, gameState: GameState
     );
 }
 
+// Helper hook for timer (could share but keeping adjacent for now)
+function useGameTimer(gameState: GameState) {
+    const [timeLeft, setTimeLeft] = useState(0);
+    useEffect(() => {
+        if (gameState?.status === "PLAYING" && gameState.timerStartedAt) {
+            const tick = () => {
+                const elapsed = (Date.now() - (gameState.timerStartedAt || 0)) / 1000;
+                const remaining = Math.max(0, (gameState.settings?.turnTimeLimit || 30) - elapsed);
+                setTimeLeft(remaining);
+            };
+            tick(); // initial
+            const interval = setInterval(tick, 500);
+            return () => clearInterval(interval);
+        } else {
+            setTimeLeft(0);
+        }
+    }, [gameState]);
+    return timeLeft;
+}
+
 function GameView({ gameId, gameState }: { gameId: string, gameState: GameState }) {
     const players = gameState.players || {};
     const currentPlayer = gameState.currentPlayerId ? players[gameState.currentPlayerId] : null;
     const story = gameState.story || [];
+    const timeLeft = useGameTimer(gameState);
 
     return (
         <div className="min-h-screen bg-zinc-900 text-white flex flex-col">
@@ -196,48 +217,49 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                     </div>
 
                     {/* Timer placeholder */}
-                    <div className="bg-zinc-800 w-16 h-16 rounded-full flex items-center justify-center border-4 border-zinc-700 text-xl font-bold font-mono">
-                        {Math.ceil(gameState.timer || 0)}
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center border-4 text-xl font-bold font-mono ${timeLeft < 10 ? 'bg-red-900 border-red-700 animate-pulse' : 'bg-zinc-800 border-zinc-700'}`}>
+                        {Math.ceil(timeLeft)}
                     </div>
                 </div>
             </div>
-
-            {/* Story Area */}
-            <div className="flex-1 p-8 sm:p-16 max-w-5xl mx-auto w-full">
-                <div className="text-4xl sm:text-5xl leading-relaxed font-serif text-zinc-300">
-                    {story.length === 0 ? (
-                        <span className="text-zinc-700 italic">Once upon a time...</span>
-                    ) : (
-                        story.map((segment) => (
-                            <span
-                                key={segment.id}
-                                style={{ color: segment.color }}
-                                className="hover:bg-zinc-800/50 rounded px-1 transition-colors cursor-pointer"
-                                title={`By ${players[segment.authorId]?.name || "Unknown"}`}
-                            >
-                                {segment.text}{" "}
-                            </span>
-                        ))
-                    )}
-
-                    {/* Cursor for current player */}
-                    {currentPlayer && (
-                        <span className="inline-block w-1 h-10 ml-1 translate-y-2 animate-pulse" style={{ backgroundColor: currentPlayer.color }} />
-                    )}
-                </div>
-            </div>
-
-            {/* Host Controls */}
-            <div className="p-6 border-t border-zinc-800 bg-zinc-900 flex justify-center gap-4">
-                <button
-                    onClick={() => gameService.nextTurn(gameId)} // Manual skip
-                    className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-lg font-bold border border-zinc-700 transition-colors"
-                >
-                    Skip Player
-                </button>
-
-                {/* Settings Toggles could go here */}
-            </div>
         </div>
+
+            {/* Story Area */ }
+    <div className="flex-1 p-8 sm:p-16 max-w-5xl mx-auto w-full">
+        <div className="text-4xl sm:text-5xl leading-relaxed font-serif text-zinc-300">
+            {story.length === 0 ? (
+                <span className="text-zinc-700 italic">Once upon a time...</span>
+            ) : (
+                story.map((segment) => (
+                    <span
+                        key={segment.id}
+                        style={{ color: segment.color }}
+                        className="hover:bg-zinc-800/50 rounded px-1 transition-colors cursor-pointer"
+                        title={`By ${players[segment.authorId]?.name || "Unknown"}`}
+                    >
+                        {segment.text}{" "}
+                    </span>
+                ))
+            )}
+
+            {/* Cursor for current player */}
+            {currentPlayer && (
+                <span className="inline-block w-1 h-10 ml-1 translate-y-2 animate-pulse" style={{ backgroundColor: currentPlayer.color }} />
+            )}
+        </div>
+    </div>
+
+    {/* Host Controls */ }
+    <div className="p-6 border-t border-zinc-800 bg-zinc-900 flex justify-center gap-4">
+        <button
+            onClick={() => gameService.nextTurn(gameId)} // Manual skip
+            className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-lg font-bold border border-zinc-700 transition-colors"
+        >
+            Skip Player
+        </button>
+
+        {/* Settings Toggles could go here */}
+    </div>
+        </div >
     );
 }
