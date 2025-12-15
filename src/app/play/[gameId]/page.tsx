@@ -25,6 +25,12 @@ function PlayerLogic() {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [error, setError] = useState<string | null>(null);
 
+    // Client-side Timer Logic (Moved up to fix Hook Error)
+    const [timeLeft, setTimeLeft] = useState(0);
+
+    // Input State (Moved up to fix Hook Error)
+    const [inputText, setInputText] = useState("");
+
     // 1. Handle ID Generation / URL Sync
     useEffect(() => {
         if (!playerIdParam) {
@@ -155,150 +161,91 @@ function PlayerLogic() {
     // WAITING / PLAYING VIEW
     const isMyTurn = gameState?.currentPlayerId === playerId;
     const isPaused = gameState?.status === "PAUSED";
+    );
+}
 
-    // Client-side Timer Logic
-    const [timeLeft, setTimeLeft] = useState(0);
-    useEffect(() => {
-        if (gameState?.status === "PLAYING" && gameState.timerStartedAt) {
-            const interval = setInterval(() => {
-                const elapsed = (Date.now() - (gameState.timerStartedAt || 0)) / 1000;
-                const remaining = Math.max(0, (gameState.settings?.turnTimeLimit || 30) - elapsed);
-                setTimeLeft(remaining);
-
-                // Local timeout check (optional, better to let server/host enforce or sync)
-            }, 500);
-            return () => clearInterval(interval);
-        }
-    }, [gameState]);
-
-    // Spec-compliant word counting
-    const countWords = (input: string): number => {
-        const trimmed = input.trim();
-        if (trimmed === '') return 0;
-
-        // Split by whitespace
-        const tokens = trimmed.split(/\s+/);
-
-        // Strip leading/trailing punctuation, keep words with content
-        const words = tokens
-            .map(t => t.replace(/^[^\w]+|[^\w]+$/g, ''))
-            .filter(t => t.length > 0);
-
-        return words.length;
-    };
-
-    // Input State
-    const [inputText, setInputText] = useState("");
-    const wordCount = countWords(inputText);
-    const maxWords = gameState?.settings?.wordLimit ?? 3;
-    const canSubmit = wordCount >= 1 && wordCount <= maxWords;
-
-    const getButtonState = () => {
-        if (wordCount === 0) return { text: "TYPE YOUR WORDS", color: "bg-red-400 text-white opacity-90" };
-        if (wordCount > maxWords) return { text: "TOO MANY WORDS", color: "bg-red-500 text-white" };
-        return { text: "SUBMIT", color: "bg-indigo-500 hover:bg-indigo-400 text-white shadow-[0_0_40px_rgba(99,102,241,0.6)] hover:scale-105 active:scale-95" };
-    };
-
-    const buttonState = getButtonState();
-
-    const handleSubmit = async () => {
-        if (!gameId || !playerId || !canSubmit) return;
-        await gameService.submitWords(gameId, playerId, inputText);
-        setInputText(""); // Clear immediately
-    };
-
-    // If we are "PLAYING" but game is paused or ended, show that
-    if (isPaused) {
-        return (
-            <div className="min-h-screen bg-zinc-900 text-white p-6 flex flex-col items-center justify-center text-center">
-                <h2 className="text-2xl font-bold mb-2 text-amber-500">GAME PAUSED</h2>
-                <p className="text-zinc-400">Waiting for players...</p>
+// If it's my turn
+if (view === "PLAYING" && isMyTurn) {
+    return (
+        <div className="min-h-screen bg-indigo-950 text-white p-6 flex flex-col items-center justify-center">
+            <div className="animate-bounce mb-6 text-center">
+                <span className="text-6xl">🫵</span>
             </div>
-        );
-    }
+            <h1 className="text-5xl font-black mb-4 tracking-tight drop-shadow-lg">YOUR TURN!</h1>
 
-    // If it's my turn
-    if (view === "PLAYING" && isMyTurn) {
-        return (
-            <div className="min-h-screen bg-indigo-950 text-white p-6 flex flex-col items-center justify-center">
-                <div className="animate-bounce mb-6 text-center">
-                    <span className="text-6xl">🫵</span>
-                </div>
-                <h1 className="text-5xl font-black mb-4 tracking-tight drop-shadow-lg">YOUR TURN!</h1>
+            <div className="font-mono text-3xl mb-12 bg-indigo-900/50 px-6 py-2 rounded-full border border-indigo-500/30 backdrop-blur-sm">
+                {Math.ceil(timeLeft)}s
+            </div>
 
-                <div className="font-mono text-3xl mb-12 bg-indigo-900/50 px-6 py-2 rounded-full border border-indigo-500/30 backdrop-blur-sm">
-                    {Math.ceil(timeLeft)}s
-                </div>
-
-                <div className="w-full max-w-md">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            value={inputText}
-                            onChange={(e) => setInputText(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                            className="w-full p-6 text-zinc-900 bg-white rounded-2xl text-3xl font-bold text-center focus:outline-none focus:ring-8 focus:ring-indigo-500/50 shadow-2xl"
-                            placeholder="Type a word..."
-                            autoFocus
-                            autoComplete="off"
-                        />
-                        {/* Word Count Badge */}
-                        <div className={`absolute -bottom-8 right-0 text-sm font-bold tracking-wider ${wordCount > maxWords ? 'text-red-400 animate-pulse' : 'text-indigo-300'}`}>
-                            {wordCount} / {maxWords} WORDS
-                        </div>
+            <div className="w-full max-w-md">
+                <div className="relative">
+                    <input
+                        type="text"
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                        className="w-full p-6 text-zinc-900 bg-white rounded-2xl text-3xl font-bold text-center focus:outline-none focus:ring-8 focus:ring-indigo-500/50 shadow-2xl"
+                        placeholder="Type a word..."
+                        autoFocus
+                        autoComplete="off"
+                    />
+                    {/* Word Count Badge */}
+                    <div className={`absolute -bottom-8 right-0 text-sm font-bold tracking-wider ${wordCount > maxWords ? 'text-red-400 animate-pulse' : 'text-indigo-300'}`}>
+                        {wordCount} / {maxWords} WORDS
                     </div>
+                </div>
 
-                    <button
-                        onClick={handleSubmit}
-                        disabled={!canSubmit}
-                        className={`
+                <button
+                    onClick={handleSubmit}
+                    disabled={!canSubmit}
+                    className={`
                             w-full font-black py-6 mt-12 rounded-2xl text-2xl tracking-widest uppercase transition-all transform
                             ${canSubmit ? buttonState.color : `${buttonState.color} cursor-not-allowed`}
                         `}
-                    >
-                        {buttonState.text}
-                    </button>
-                </div>
+                >
+                    {buttonState.text}
+                </button>
             </div>
-        );
-    }
-
-    // Default Waiting Screen (not my turn, or lobby)
-    return (
-        <div className="min-h-screen bg-zinc-900 text-white p-6 flex flex-col items-center justify-center">
-            <div className="w-full max-w-sm bg-zinc-800 p-6 rounded-2xl border border-zinc-700 text-center">
-                <div
-                    className="w-16 h-16 rounded-full mx-auto mb-4 border-4 border-zinc-900 shadow-xl"
-                    style={{ backgroundColor: playerData?.color }}
-                />
-                <h2 className="text-2xl font-bold mb-2">{playerData?.name}</h2>
-
-                {gameState?.status === "PLAYING" ? (
-                    <div className="mt-4">
-                        <p className="text-zinc-400 animate-pulse">Waiting for turn...</p>
-                        {gameState.currentPlayerId && (
-                            <div className="bg-zinc-900/50 rounded p-2 mt-4 inline-block">
-                                <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Current Turn</p>
-                                <p className="font-bold text-indigo-400">
-                                    {gameState.players?.[gameState.currentPlayerId]?.name || "Unknown"}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <p className="text-zinc-400">Waiting for host to start...</p>
-                )}
-            </div>
-
-            <button
-                onClick={handleLeaveGame}
-                className="mt-8 text-zinc-500 text-sm hover:text-white underline decoration-zinc-700"
-            >
-                Leave Game
-            </button>
-
         </div>
     );
+}
+
+// Default Waiting Screen (not my turn, or lobby)
+return (
+    <div className="min-h-screen bg-zinc-900 text-white p-6 flex flex-col items-center justify-center">
+        <div className="w-full max-w-sm bg-zinc-800 p-6 rounded-2xl border border-zinc-700 text-center">
+            <div
+                className="w-16 h-16 rounded-full mx-auto mb-4 border-4 border-zinc-900 shadow-xl"
+                style={{ backgroundColor: playerData?.color }}
+            />
+            <h2 className="text-2xl font-bold mb-2">{playerData?.name}</h2>
+
+            {gameState?.status === "PLAYING" ? (
+                <div className="mt-4">
+                    <p className="text-zinc-400 animate-pulse">Waiting for turn...</p>
+                    {gameState.currentPlayerId && (
+                        <div className="bg-zinc-900/50 rounded p-2 mt-4 inline-block">
+                            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Current Turn</p>
+                            <p className="font-bold text-indigo-400">
+                                {gameState.players?.[gameState.currentPlayerId]?.name || "Unknown"}
+                            </p>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <p className="text-zinc-400">Waiting for host to start...</p>
+            )}
+        </div>
+
+        <button
+            onClick={handleLeaveGame}
+            className="mt-8 text-zinc-500 text-sm hover:text-white underline decoration-zinc-700"
+        >
+            Leave Game
+        </button>
+
+    </div>
+);
 }
 
 export default function PlayerPage() {
