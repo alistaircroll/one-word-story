@@ -65,15 +65,19 @@ function PlayerLogic() {
         checkPlayer();
     }, [playerId, gameId]);
 
-    // 3. Subscribe to Game State (Only after we know who we are? Or always?)
-    // Actually, likely always good to listen to know if game paused etc.
+    // 3. Subscribe to Game State
     useEffect(() => {
         if (!gameId) return;
         const unsubscribe = gameService.subscribeToGame(gameId, (data) => {
             setGameState(data);
+            // Auto-switch to PLAYING view if game started and we are waiting
+            if (data && data.status === "PLAYING" && view === "WAITING") {
+                setView("PLAYING");
+            }
+            // If game ends, maybe switch to ENDED? (Will handle later)
         });
         return () => unsubscribe();
-    }, [gameId]);
+    }, [gameId, view]); // view dep ensures we only switch if currently waiting
 
 
     const handleSubmitName = async () => {
@@ -99,6 +103,15 @@ function PlayerLogic() {
         }
     };
 
+    const handleLeaveGame = async () => {
+        if (confirm("Are you sure you want to leave this story? You can rejoin properly later.")) {
+            if (gameId && playerId) {
+                await gameService.leaveGame(gameId, playerId);
+            }
+            router.push('/');
+        }
+    };
+
     if (!playerIdParam) return null; // Wait for redirect
     if (loading) return <div className="p-8 text-center text-white bg-black h-screen flex items-center justify-center">Loading...</div>;
     if (error) return <div className="p-8 text-center text-red-500 bg-black h-screen flex items-center justify-center">{error}</div>;
@@ -117,6 +130,7 @@ function PlayerLogic() {
                             type="text"
                             value={playerName}
                             onChange={(e) => setPlayerName(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSubmitName()}
                             className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                             placeholder="Enter name..."
                             maxLength={12}
@@ -139,6 +153,40 @@ function PlayerLogic() {
     }
 
     // WAITING / PLAYING VIEW
+    const isMyTurn = gameState?.currentPlayerId === playerId;
+    const isPaused = gameState?.status === "PAUSED";
+    const isEnded = gameState?.status === "ENDED";
+
+    // If we are "PLAYING" but game is paused or ended, show that
+    if (isPaused) {
+        return (
+            <div className="min-h-screen bg-zinc-900 text-white p-6 flex flex-col items-center justify-center text-center">
+                <h2 className="text-2xl font-bold mb-2 text-amber-500">GAME PAUSED</h2>
+                <p className="text-zinc-400">Waiting for players...</p>
+            </div>
+        );
+    }
+
+    // If it's my turn
+    if (view === "PLAYING" && isMyTurn) {
+        return (
+            <div className="min-h-screen bg-indigo-950 text-white p-6 flex flex-col items-center justify-center">
+                <div className="animate-bounce mb-8">
+                    <span className="text-4xl">🫵</span>
+                </div>
+                <h1 className="text-4xl font-bold mb-4">YOUR TURN!</h1>
+                <p className="text-indigo-200 mb-8">Look at the host screen!</p>
+
+                {/* Input Input Component will go here Phase 3 */}
+                <div className="w-full max-w-sm">
+                    <input type="text" placeholder="Type a word..." className="w-full p-4 text-black rounded-lg" />
+                    <button className="w-full bg-white text-indigo-900 font-bold py-4 mt-4 rounded-lg">SUBMIT</button>
+                </div>
+            </div>
+        );
+    }
+
+    // Default Waiting Screen (not my turn, or lobby)
     return (
         <div className="min-h-screen bg-zinc-900 text-white p-6 flex flex-col items-center justify-center">
             <div className="w-full max-w-sm bg-zinc-800 p-6 rounded-2xl border border-zinc-700 text-center">
@@ -147,10 +195,25 @@ function PlayerLogic() {
                     style={{ backgroundColor: playerData?.color }}
                 />
                 <h2 className="text-2xl font-bold mb-2">{playerData?.name}</h2>
-                <p className="text-zinc-400">Waiting for host...</p>
+
+                {gameState?.status === "PLAYING" ? (
+                    <div className="mt-4">
+                        <p className="text-zinc-400 animate-pulse">Waiting for turn...</p>
+                        {gameState.currentPlayerId && (
+                            <p className="text-xs text-zinc-500 mt-2">
+                                Current turn: {gameState.players?.[gameState.currentPlayerId]?.name || "Unknown"}
+                            </p>
+                        )}
+                    </div>
+                ) : (
+                    <p className="text-zinc-400">Waiting for host to start...</p>
+                )}
             </div>
 
-            <button className="mt-8 text-zinc-500 text-sm hover:text-white underline decoration-zinc-700">
+            <button
+                onClick={handleLeaveGame}
+                className="mt-8 text-zinc-500 text-sm hover:text-white underline decoration-zinc-700"
+            >
                 Leave Game
             </button>
         </div>

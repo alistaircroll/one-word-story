@@ -166,11 +166,78 @@ function LobbyView({ gameId, gameState }: { gameId: string, gameState: GameState
 }
 
 function GameView({ gameId, gameState }: { gameId: string, gameState: GameState }) {
-    // Placeholder for Phase 3
+    const players = gameState.players || {};
+    const currentPlayer = gameState.currentPlayerId ? players[gameState.currentPlayerId] : null;
+    const story = gameState.story || [];
+
     return (
-        <div className="min-h-screen bg-zinc-900 text-white p-8">
-            <h1 className="text-4xl text-center mt-20">Game in Progress</h1>
-            <p className="text-center text-zinc-400 mt-4">Development in progress...</p>
+        <div className="min-h-screen bg-zinc-900 text-white flex flex-col">
+            {/* Top Bar */}
+            <div className="flex justify-between items-center p-6 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-10">
+                <div className="flex items-center gap-4">
+                    <h1 className="text-xl font-bold tracking-tight text-zinc-400">ONE WORD STORY</h1>
+                    <div className="bg-zinc-800 px-3 py-1 rounded text-sm font-mono border border-zinc-700">
+                        {gameId}
+                    </div>
+                </div>
+
+                {/* Active Player Status */}
+                <div className="flex items-center gap-6">
+                    <div className="text-right">
+                        <div className="text-xs text-zinc-500 uppercase tracking-widest">Current Turn</div>
+                        {currentPlayer ? (
+                            <div className="text-xl font-bold flex items-center justify-end gap-2">
+                                <span className="w-3 h-3 rounded-full" style={{ background: currentPlayer.color }}></span>
+                                {currentPlayer.name}
+                            </div>
+                        ) : (
+                            <div className="text-xl font-bold text-zinc-500">PAUSED</div>
+                        )}
+                    </div>
+
+                    {/* Timer placeholder */}
+                    <div className="bg-zinc-800 w-16 h-16 rounded-full flex items-center justify-center border-4 border-zinc-700 text-xl font-bold font-mono">
+                        {Math.ceil(gameState.timer || 0)}
+                    </div>
+                </div>
+            </div>
+
+            {/* Story Area */}
+            <div className="flex-1 p-8 sm:p-16 max-w-5xl mx-auto w-full">
+                <div className="text-4xl sm:text-5xl leading-relaxed font-serif text-zinc-300">
+                    {story.length === 0 ? (
+                        <span className="text-zinc-700 italic">Once upon a time...</span>
+                    ) : (
+                        story.map((segment) => (
+                            <span
+                                key={segment.id}
+                                style={{ color: segment.color }}
+                                className="hover:bg-zinc-800/50 rounded px-1 transition-colors cursor-pointer"
+                                title={`By ${players[segment.authorId]?.name || "Unknown"}`}
+                            >
+                                {segment.text}{" "}
+                            </span>
+                        ))
+                    )}
+
+                    {/* Cursor for current player */}
+                    {currentPlayer && (
+                        <span className="inline-block w-1 h-10 ml-1 translate-y-2 animate-pulse" style={{ backgroundColor: currentPlayer.color }} />
+                    )}
+                </div>
+            </div>
+
+            {/* Host Controls */}
+            <div className="p-6 border-t border-zinc-800 bg-zinc-900 flex justify-center gap-4">
+                <button
+                    onClick={() => gameService.nextTurn(gameId)} // Manual skip
+                    className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-lg font-bold border border-zinc-700 transition-colors"
+                >
+                    Skip Player
+                </button>
+
+                {/* Settings Toggles could go here */}
+            </div>
         </div>
     );
 }

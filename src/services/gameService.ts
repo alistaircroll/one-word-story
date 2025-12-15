@@ -131,10 +131,44 @@ export const gameService = {
     },
 
     async startGame(gameId: string) {
+        // Trigger the first turn!
+        // We need to fetch current players first
+        const playersRef = ref(db, `games/${gameId}/players`);
+        const snapshot = await get(playersRef);
+        const players = snapshot.val() || {};
+        const playerIds = Object.keys(players).filter(key => players[key].isActive);
+
+        if (playerIds.length < 2) { // Should be GAME_RULES.MIN_PLAYERS
+            console.error("Not enough players");
+            return;
+        }
+
+        // Initial shuffle
+        const shuffled = playerIds.sort(() => Math.random() - 0.5);
+        const firstPlayer = shuffled[0];
+        const remainingBag = shuffled.slice(1);
+
+        const updates: any = {
+            status: "PLAYING",
+            currentPlayerId: firstPlayer,
+            turnBag: remainingBag,
+            lastPlayerId: null, // First turn has no previous player
+            timer: 30, // Default turn time (should come from settings)
+            timerStartedAt: Date.now()
+        };
+
         const gameRef = ref(db, `games/${gameId}`);
-        // We just update status to PLAYING.
-        // The "Bag Shuffle" logic is part of Phase 3, we can call a separate function or do it here.
-        // Let's keep it simple: just set status. The first turn logic will trigger or be handled by Host effect.
-        await update(gameRef, { status: "PLAYING" });
+        await update(gameRef, updates);
+    },
+
+    async nextTurn(gameId: string) {
+        // Logic for moving to next player
+        // This will be implemented fully in next step, needing `runTransaction` or careful reading
+    },
+
+    async leaveGame(gameId: string, playerId: string) {
+        const playerRef = ref(db, `games/${gameId}/players/${playerId}`);
+        await update(playerRef, { isActive: false });
+        // TODO: functionality to auto-pause if falling below min players will be in nextTurn or separate listener
     }
 };
