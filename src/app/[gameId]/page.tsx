@@ -222,44 +222,42 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                     </div>
                 </div>
             </div>
-        </div>
+            {/* Story Area */}
+            <div className="flex-1 p-8 sm:p-16 max-w-5xl mx-auto w-full">
+                <div className="text-4xl sm:text-5xl leading-relaxed font-serif text-zinc-300">
+                    {story.length === 0 ? (
+                        <span className="text-zinc-700 italic">Once upon a time...</span>
+                    ) : (
+                        story.map((segment) => (
+                            <span
+                                key={segment.id}
+                                style={{ color: segment.color }}
+                                className="hover:bg-zinc-800/50 rounded px-1 transition-colors cursor-pointer"
+                                title={`By ${players[segment.authorId]?.name || "Unknown"}`}
+                            >
+                                {segment.text}{" "}
+                            </span>
+                        ))
+                    )}
 
-            {/* Story Area */ }
-    <div className="flex-1 p-8 sm:p-16 max-w-5xl mx-auto w-full">
-        <div className="text-4xl sm:text-5xl leading-relaxed font-serif text-zinc-300">
-            {story.length === 0 ? (
-                <span className="text-zinc-700 italic">Once upon a time...</span>
-            ) : (
-                story.map((segment) => (
-                    <span
-                        key={segment.id}
-                        style={{ color: segment.color }}
-                        className="hover:bg-zinc-800/50 rounded px-1 transition-colors cursor-pointer"
-                        title={`By ${players[segment.authorId]?.name || "Unknown"}`}
-                    >
-                        {segment.text}{" "}
-                    </span>
-                ))
-            )}
+                    {/* Cursor for current player */}
+                    {currentPlayer && (
+                        <span className="inline-block w-1 h-10 ml-1 translate-y-2 animate-pulse" style={{ backgroundColor: currentPlayer.color }} />
+                    )}
+                </div>
+            </div>
 
-            {/* Cursor for current player */}
-            {currentPlayer && (
-                <span className="inline-block w-1 h-10 ml-1 translate-y-2 animate-pulse" style={{ backgroundColor: currentPlayer.color }} />
-            )}
-        </div>
-    </div>
+            {/* Host Controls */}
+            <div className="p-6 border-t border-zinc-800 bg-zinc-900 flex justify-center gap-4">
+                <button
+                    onClick={() => gameService.nextTurn(gameId)} // Manual skip
+                    className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-lg font-bold border border-zinc-700 transition-colors"
+                >
+                    Skip Player
+                </button>
 
-    {/* Host Controls */ }
-    <div className="p-6 border-t border-zinc-800 bg-zinc-900 flex justify-center gap-4">
-        <button
-            onClick={() => gameService.nextTurn(gameId)} // Manual skip
-            className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-lg font-bold border border-zinc-700 transition-colors"
-        >
-            Skip Player
-        </button>
-
-        {/* Settings Toggles could go here */}
-    </div>
+                {/* Settings Toggles could go here */}
+            </div>
         </div >
     );
 }
