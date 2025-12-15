@@ -232,7 +232,7 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                             <span
                                 key={segment.id}
                                 style={{ color: segment.color }}
-                                className="hover:bg-zinc-800/50 rounded px-1 transition-colors cursor-pointer"
+                                className="hover:bg-zinc-800/50 rounded transition-colors cursor-pointer"
                                 title={`By ${players[segment.authorId]?.name || "Unknown"}`}
                             >
                                 {segment.text}{" "}

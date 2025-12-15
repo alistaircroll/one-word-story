@@ -237,15 +237,14 @@ export const gameService = {
                 const lastSegment = story.length > 0 ? story[story.length - 1] : null;
                 const lastChar = lastSegment ? lastSegment.text.trim().slice(-1) : null;
 
-                // Capitalize if: Start of story OR Previous ended with . ? ! OR Previous was empty (edge case)
-                const shouldCapitalize = !lastSegment || ['.', '!', '?'].includes(lastChar);
+                // Capitalize if: Start of story OR Previous ended with . ? ! : OR Previous was empty (edge case)
+                const shouldCapitalize = !lastSegment || ['.', '!', '?', ':'].includes(lastChar);
 
                 if (shouldCapitalize) {
                     finalText = finalText.charAt(0).toUpperCase() + finalText.slice(1);
                 } else {
-                    // Ensure lowercase otherwise? 
-                    // Spec implies "First letter... automatically capitalized". 
-                    // If user typed "hello", and it's NOT start of sentence, keep it "hello".
+                    // Force lowercase to override mobile keyboard auto-capitalization
+                    finalText = finalText.charAt(0).toLowerCase() + finalText.slice(1);
                 }
             }
 
