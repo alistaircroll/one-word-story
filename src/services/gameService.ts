@@ -217,36 +217,53 @@ export const gameService = {
         });
     },
 
-    async submitWords(gameId: string, playerId: string, text: string) {
-        const { v4: uuidv4 } = await import("uuid");
+    const { v4: uuidv4 } = await import("uuid");
 
-        // 1. Add story segment
-        // We use runTransaction on the story array to safely append
-        const storyRef = ref(db, `games/${gameId}/story`);
-        // Snapshot to get current player color
-        const playerRef = ref(db, `games/${gameId}/players/${playerId}`);
-        const playerSnap = await get(playerRef);
-        const playerColor = playerSnap.exists() ? playerSnap.val().color : "#000000";
+    // 1. Add story segment
+    // We use runTransaction on the story array to safely append
+    const storyRef = ref(db, `games/${gameId}/story`);
+    // Snapshot to get current player color
+    const playerRef = ref(db, `games/${gameId}/players/${playerId}`);
+    const playerSnap = await get(playerRef);
+    const playerColor = playerSnap.exists() ? playerSnap.val().color : "#000000";
 
-        await import("firebase/database").then(({ runTransaction }) => {
-            runTransaction(storyRef, (story) => {
-                if (!story) story = [];
+    await import("firebase/database").then(({ runTransaction }) => {
+        runTransaction(storyRef, (story: any[]) => { // basic typing for internal block
+            if (!story) story = [];
 
-                story.push({
-                    id: uuidv4(),
-                    text: text,
-                    authorId: playerId,
-                    color: playerColor,
-                    timestamp: Date.now()
-                });
+            // Capitalization Logic
+            let finalText = text.trim();
+            if (finalText.length > 0) {
+                const lastSegment = story.length > 0 ? story[story.length - 1] : null;
+                const lastChar = lastSegment ? lastSegment.text.trim().slice(-1) : null;
 
-                return story;
+                // Capitalize if: Start of story OR Previous ended with . ? ! OR Previous was empty (edge case)
+                const shouldCapitalize = !lastSegment || ['.', '!', '?'].includes(lastChar);
+
+                if (shouldCapitalize) {
+                    finalText = finalText.charAt(0).toUpperCase() + finalText.slice(1);
+                } else {
+                    // Ensure lowercase otherwise? 
+                    // Spec implies "First letter... automatically capitalized". 
+                    // If user typed "hello", and it's NOT start of sentence, keep it "hello".
+                }
+            }
+
+            story.push({
+                id: uuidv4(),
+                text: finalText,
+                authorId: playerId,
+                color: playerColor,
+                timestamp: Date.now()
             });
-        });
 
-        // 2. Advance turn
-        await this.nextTurn(gameId);
-    },
+            return story;
+        });
+    });
+
+    // 2. Advance turn
+    await this.nextTurn(gameId);
+},
 
     async leaveGame(gameId: string, playerId: string) {
         const playerRef = ref(db, `games/${gameId}/players/${playerId}`);

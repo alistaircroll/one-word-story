@@ -176,7 +176,12 @@ function PlayerLogic() {
     const canSubmit = wordCount >= 1 && wordCount <= maxWords;
 
     const getButtonState = () => {
-        if (wordCount === 0) return { text: "TYPE YOUR WORDS", color: "bg-red-400 text-white opacity-90" };
+        if (wordCount === 0) {
+            return {
+                text: maxWords === 1 ? "TYPE A WORD" : "TYPE YOUR WORDS",
+                color: "bg-red-400 text-white opacity-90"
+            };
+        }
         if (wordCount > maxWords) return { text: "TOO MANY WORDS", color: "bg-red-500 text-white" };
         return { text: "SUBMIT", color: "bg-indigo-500 hover:bg-indigo-400 text-white shadow-[0_0_40px_rgba(99,102,241,0.6)] hover:scale-105 active:scale-95" };
     };
@@ -220,7 +225,7 @@ function PlayerLogic() {
                             onChange={(e) => setInputText(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
                             className="w-full p-6 text-zinc-900 bg-white rounded-2xl text-3xl font-bold text-center focus:outline-none focus:ring-8 focus:ring-indigo-500/50 shadow-2xl"
-                            placeholder="Type a word..."
+                            placeholder={maxWords === 1 ? "Type a word..." : `Type ${maxWords} words...`}
                             autoFocus
                             autoComplete="off"
                         />
