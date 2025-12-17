@@ -358,63 +358,70 @@ function PlayerLogic() {
         const timerPercent = Math.max(0, Math.min(100, (timeLeft / turnDuration) * 100));
 
         return (
-            <div className="min-h-screen bg-indigo-950 text-white p-6 flex flex-col items-center justify-center relative overflow-hidden">
+            <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-indigo-950 to-zinc-900 text-white flex flex-col">
                 {/* Progress bar at top */}
-                <div className="absolute top-0 left-0 right-0 h-2 bg-indigo-900">
+                <div className="h-2 bg-indigo-900/50">
                     <div
-                        className={`h-full transition-all duration-100 ${timerPercent < 33 ? 'bg-red-500' : timerPercent < 66 ? 'bg-amber-500' : 'bg-green-500'}`}
+                        className={`h-full transition-all duration-100 ${timerPercent < 33 ? 'bg-red-500' : timerPercent < 66 ? 'bg-amber-400' : 'bg-emerald-400'}`}
                         style={{ width: `${timerPercent}%` }}
                     />
                 </div>
 
-                {/* Story context */}
+                {/* Story context - Prominent card at top */}
                 {lastWords && (
-                    <div className="absolute top-6 left-0 right-0 px-6">
-                        <p className="text-center text-indigo-300/70 text-lg italic truncate">
-                            ...{lastWords}
-                        </p>
+                    <div className="px-4 pt-4">
+                        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                            <p className="text-xs uppercase tracking-wider text-indigo-300 mb-2 font-bold">Continue the story...</p>
+                            <p className="text-white text-lg leading-relaxed font-serif">
+                                "...{lastWords}"
+                            </p>
+                        </div>
                     </div>
                 )}
 
-                <div className="animate-bounce mb-6 text-center">
-                    <span className="text-6xl">🫵</span>
-                </div>
-                <h1 className="text-5xl font-black mb-4 tracking-tight drop-shadow-lg">YOUR TURN!</h1>
+                {/* Main input area */}
+                <div className="flex-1 flex flex-col items-center justify-center p-6">
+                    {/* Timer badge */}
+                    <div className={`font-mono text-4xl font-bold mb-6 px-6 py-3 rounded-full ${timerPercent < 33 ? 'bg-red-500/20 text-red-400 animate-pulse' :
+                        timerPercent < 66 ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-emerald-500/20 text-emerald-400'
+                        }`}>
+                        {Math.ceil(timeLeft)}s
+                    </div>
 
-                <div className="font-mono text-3xl mb-12 bg-indigo-900/50 px-6 py-2 rounded-full border border-indigo-500/30 backdrop-blur-sm">
-                    {Math.ceil(timeLeft)}s
-                </div>
-
-                <div className="w-full max-w-md">
-                    <div className="relative">
+                    {/* Input field */}
+                    <div className="w-full max-w-md">
                         <input
                             type="text"
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                            className="w-full p-6 text-zinc-900 bg-white rounded-2xl text-3xl font-bold text-center focus:outline-none focus:ring-8 focus:ring-indigo-500/50 shadow-2xl"
+                            className="w-full p-5 text-zinc-900 bg-white rounded-2xl text-2xl font-bold text-center focus:outline-none focus:ring-4 focus:ring-indigo-400 shadow-2xl"
                             placeholder={maxWords === 1 ? "Type a word..." : `Type ${maxWords} words...`}
                             autoFocus
                             autoComplete="off"
                         />
-                        {/* Word Count Badge */}
-                        <div className={`absolute -bottom-8 right-0 text-sm font-bold tracking-wider ${wordCount > maxWords ? 'text-red-400 animate-pulse' : 'text-indigo-300'}`}>
+
+                        {/* Word Count */}
+                        <div className={`text-center mt-3 text-sm font-bold tracking-wider ${wordCount > maxWords ? 'text-red-400 animate-pulse' : 'text-zinc-400'}`}>
                             {wordCount} / {maxWords} WORDS
                         </div>
                     </div>
 
+                    {/* Submit button */}
                     <button
                         onClick={handleSubmit}
                         disabled={!canSubmit}
                         className={`
-                                w-full font-black py-6 mt-12 rounded-2xl text-2xl tracking-widest uppercase transition-all transform
-                                ${canSubmit ? buttonState.color : `${buttonState.color} cursor-not-allowed`}
-                            `}
+                            w-full max-w-md font-black py-5 mt-6 rounded-2xl text-xl tracking-wider uppercase transition-all transform
+                            ${canSubmit ? buttonState.color : `${buttonState.color} cursor-not-allowed`}
+                        `}
                     >
                         {buttonState.text}
                     </button>
+
                     {!canSubmit && wordCount > 0 && (
-                        <p className="text-center mt-4 text-indigo-400/80 text-sm">
+                        <p className="text-center mt-3 text-indigo-300 text-sm">
                             {wordCount > maxWords ? `Maximum ${maxWords} word${maxWords > 1 ? 's' : ''} allowed!` : "Type something!"}
                         </p>
                     )}
