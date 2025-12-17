@@ -7,7 +7,7 @@ import { gameService } from "@/services/gameService";
 import { GameState, Player } from "@/types";
 import { ref, get, child } from "firebase/database";
 import { db } from "@/lib/firebase";
-import { GAME_RULES, TIMERS } from "@/lib/constants";
+import { GAME_RULES, TIMERS, LEADERBOARD } from "@/lib/constants";
 
 // We need to wrap the logic in a component that uses useSearchParams inside Suspense
 function PlayerLogic() {
@@ -31,6 +31,9 @@ function PlayerLogic() {
 
     // Input State (Moved up to fix Hook Error)
     const [inputText, setInputText] = useState("");
+
+    // Toast State
+    const [toast, setToast] = useState<{ visible: boolean, message: string }>({ visible: false, message: "" });
 
     // 1. Handle ID Generation / URL Sync
     useEffect(() => {
@@ -101,6 +104,26 @@ function PlayerLogic() {
         });
         return () => unsubscribe();
     }, [gameId, view]); // view dep ensures we only switch if currently waiting
+
+    // Toast Logic
+    useEffect(() => {
+        if (!gameState?.story || gameState.story.length === 0 || !playerId) return;
+
+        const lastSegment = gameState.story[gameState.story.length - 1];
+        // If I wrote it AND it's new ( < 5s ago)
+        if (lastSegment.authorId === playerId && (Date.now() - lastSegment.timestamp < 5000)) {
+            const speed = lastSegment.metadata?.responseTime;
+            if (speed) {
+                if (speed <= LEADERBOARD.VERY_FAST_THRESHOLD_MS) {
+                    setToast({ visible: true, message: `⚡ ${(speed / 1000).toFixed(1)}s!` });
+                    setTimeout(() => setToast({ visible: false, message: "" }), 2500);
+                } else if (speed <= LEADERBOARD.FAST_THRESHOLD_MS) {
+                    setToast({ visible: true, message: `🔥 ${(speed / 1000).toFixed(1)}s` });
+                    setTimeout(() => setToast({ visible: false, message: "" }), 2500);
+                }
+            }
+        }
+    }, [gameState?.story?.length, playerId]);
 
     // 4. Timer calculation
     useEffect(() => {

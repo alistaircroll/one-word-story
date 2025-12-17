@@ -11,6 +11,10 @@ export interface Player {
     color: string;
     isActive: boolean;
     lastSeen: number;
+    // Stats
+    totalResponseTime?: number;
+    turnCount?: number;
+    lastTurnTime?: number | null;
 }
 
 export interface StorySegment {
@@ -19,6 +23,9 @@ export interface StorySegment {
     authorId: string; // "HOST" if edited by host
     color: string;
     timestamp: number;
+    metadata?: {
+        responseTime?: number;
+    };
 }
 
 export interface GameState {

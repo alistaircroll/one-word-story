@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { gameService } from "@/services/gameService";
 import { GameState, GameStatus } from "@/types";
-import { GAME_RULES } from "@/lib/constants";
+import { GAME_RULES, LEADERBOARD } from "@/lib/constants";
 
 export default function HostGamePage() {
     const params = useParams();
@@ -307,16 +307,35 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                     </div>
                 </div>
 
-                {/* QR Sidebar */}
-                <div className="hidden lg:flex flex-col items-center justify-center p-6 bg-zinc-800/30 border-l border-zinc-800 w-64">
-                    <p className="text-zinc-500 text-xs uppercase tracking-widest mb-2">Join Game</p>
-                    {origin && (
-                        <div className="bg-white p-2 rounded-lg">
-                            <QRCodeSVG value={joinUrl} size={120} />
-                        </div>
-                    )}
-                    <p className="text-indigo-400 font-mono font-bold text-2xl mt-3">{gameId}</p>
+                {/* Leaderboard Sidebar */}
+                <div className={`hidden lg:flex flex-col p-6 bg-zinc-900 border-l border-zinc-800 w-80 shadow-xl z-20 ${gameState.status === 'LOBBY' ? 'hidden' : ''}`}>
+                    <div className="mb-6 flex-1 overflow-hidden flex flex-col">
+                        <Leaderboard players={players || {}} currentPlayerId={gameState.currentPlayerId} />
+                    </div>
+
+                    {/* QR Mini Code */}
+                    <div className="border-t border-zinc-800 pt-4 flex flex-col items-center bg-zinc-900/50">
+                        <p className="text-zinc-600 text-[10px] uppercase tracking-widest mb-2">Join Code: <span className="text-indigo-400 font-bold text-sm">{gameId}</span></p>
+                        {origin && (
+                            <div className="bg-white p-1 rounded">
+                                <QRCodeSVG value={joinUrl} size={80} />
+                            </div>
+                        )}
+                    </div>
                 </div>
+
+                {/* QR Sidebar (Only for LOBBY) */}
+                {gameState.status === "LOBBY" && (
+                    <div className="hidden lg:flex flex-col items-center justify-center p-6 bg-zinc-800/30 border-l border-zinc-800 w-80">
+                        <p className="text-zinc-500 text-xs uppercase tracking-widest mb-2">Join Game</p>
+                        {origin && (
+                            <div className="bg-white p-2 rounded-lg">
+                                <QRCodeSVG value={joinUrl} size={120} />
+                            </div>
+                        )}
+                        <p className="text-indigo-400 font-mono font-bold text-2xl mt-3">{gameId}</p>
+                    </div>
+                )}
             </div>
 
             {/* Host Controls */}
@@ -429,13 +448,6 @@ function SettingsModal({ gameId, settings, isOpen, onClose }: { gameId: string, 
         onClose();
     };
 
-    const handleEndGame = () => {
-        if (confirm("End the story here? Players won't be able to add more words.")) {
-            gameService.endGame(gameId);
-            onClose();
-        }
-    };
-
     const handleClearPlayers = () => {
         if (confirm("NUCLEAR OPTION: This will kick EVERYONE out of the game. Are you sure?")) {
             gameService.clearPlayers(gameId);
@@ -443,15 +455,23 @@ function SettingsModal({ gameId, settings, isOpen, onClose }: { gameId: string, 
         }
     };
 
-    return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-zinc-800 p-8 rounded-xl max-w-md w-full border border-zinc-700 shadow-2xl">
-                <h2 className="text-xl font-bold mb-6 text-white">Game Settings</h2>
+    const handleEndGame = () => {
+        if (confirm("Are you sure you want to END the story now? This cannot be undone.")) {
+            gameService.endGame(gameId);
+            onClose();
+        }
+    };
 
+    return (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+            <div className="bg-zinc-800 p-8 rounded-xl max-w-lg w-full border border-zinc-700 shadow-2xl">
+                <h2 className="text-2xl font-bold mb-6 text-white border-b border-zinc-700 pb-2">Game Settings</h2>
+
+                {/* Word Limit Slider */}
                 <div className="mb-6">
-                    <label className="block text-zinc-400 mb-2">Maximum Words per Turn: <span className="text-white font-bold">{localSettings.wordLimit}</span></label>
+                    <label className="block text-zinc-400 mb-2">Word Limit: <span className="text-white font-bold">{localSettings.wordLimit}</span></label>
                     <input
-                        type="range" min="1" max="5" step="1"
+                        type="range" min="1" max="5"
                         value={localSettings.wordLimit}
                         onChange={(e) => setLocalSettings({ ...localSettings, wordLimit: parseInt(e.target.value) })}
                         className="w-full accent-indigo-500 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
@@ -461,6 +481,7 @@ function SettingsModal({ gameId, settings, isOpen, onClose }: { gameId: string, 
                     </div>
                 </div>
 
+                {/* Turn Timer Slider */}
                 <div className="mb-8">
                     <label className="block text-zinc-400 mb-2">Turn Timer (Seconds): <span className="text-white font-bold">{localSettings.turnTimeLimit}s</span></label>
                     <input
@@ -474,6 +495,7 @@ function SettingsModal({ gameId, settings, isOpen, onClose }: { gameId: string, 
                     </div>
                 </div>
 
+                {/* Dangerous Actions */}
                 <div className="flex flex-col sm:flex-row justify-between gap-4 border-t border-zinc-700 pt-6 items-center">
                     <div className="flex flex-col gap-3 items-start">
                         <button
@@ -508,4 +530,193 @@ function SettingsModal({ gameId, settings, isOpen, onClose }: { gameId: string, 
             </div>
         </div>
     );
+}
+
+function Leaderboard({ players, currentPlayerId }: { players: Record<string, any>, currentPlayerId: string | null }) {
+    const sortedPlayers = Object.values(players)
+        .filter((p: any) => p.isActive)
+        .sort((a: any, b: any) => {
+            const timeA = a.totalResponseTime || 0;
+            const timeB = b.totalResponseTime || 0;
+            if (timeA !== timeB) return timeA - timeB; // ASC
+            return (a.turnCount || 0) - (b.turnCount || 0);
+        });
+
+    return (
+        <div className="bg-zinc-800/30 rounded-xl p-4 border border-zinc-700/50 flex flex-col h-full">
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-300">
+                <span>🏆</span> LEADERBOARD
+            </h2>
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                {sortedPlayers.map((player: any, index: number) => {
+                    const isCurrent = player.id === currentPlayerId;
+                    const totalSeconds = ((player.totalResponseTime || 0) / 1000).toFixed(1);
+
+                    return (
+                        <div
+                            key={player.id}
+                            className={`flex items-center justify-between p-2 rounded-lg border transition-all text-sm ${isCurrent
+                                ? "bg-zinc-700 border-zinc-500 shadow-md transform scale-102"
+                                : "bg-zinc-800/50 border-zinc-700/30"
+                                }`}
+                        >
+                            <div className="flex items-center gap-2 overflow-hidden">
+                                <span className="font-mono text-zinc-600 w-4 text-right text-xs">
+                                    {index + 1}.
+                                </span>
+                                <div
+                                    className="w-2 h-2 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: player.color }}
+                                />
+                                <span className={`truncate max-w-[100px] font-bold ${isCurrent ? "text-white" : "text-zinc-400"}`}>
+                                    {player.name}
+                                </span>
+                            </div>
+                            <div className="font-mono text-indigo-400 font-bold text-xs">
+                                {totalSeconds}s
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+if (!isOpen) return null;
+
+const handleSave = () => {
+    gameService.updateSettings(gameId, localSettings);
+    onClose();
+};
+
+const handleEndGame = () => {
+    if (confirm("End the story here? Players won't be able to add more words.")) {
+        gameService.endGame(gameId);
+        onClose();
+    }
+};
+
+const handleClearPlayers = () => {
+    if (confirm("NUCLEAR OPTION: This will kick EVERYONE out of the game. Are you sure?")) {
+        gameService.clearPlayers(gameId);
+        onClose();
+    }
+};
+
+return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="bg-zinc-800 p-8 rounded-xl max-w-md w-full border border-zinc-700 shadow-2xl">
+            <h2 className="text-xl font-bold mb-6 text-white">Game Settings</h2>
+
+            <div className="mb-6">
+                <label className="block text-zinc-400 mb-2">Maximum Words per Turn: <span className="text-white font-bold">{localSettings.wordLimit}</span></label>
+                <input
+                    type="range" min="1" max="5" step="1"
+                    value={localSettings.wordLimit}
+                    onChange={(e) => setLocalSettings({ ...localSettings, wordLimit: parseInt(e.target.value) })}
+                    className="w-full accent-indigo-500 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
+                />
+                <div className="flex justify-between text-xs text-zinc-500 mt-1">
+                    <span>1</span><span>5</span>
+                </div>
+            </div>
+
+            <div className="mb-8">
+                <label className="block text-zinc-400 mb-2">Turn Timer (Seconds): <span className="text-white font-bold">{localSettings.turnTimeLimit}s</span></label>
+                <input
+                    type="range" min="10" max="60" step="5"
+                    value={localSettings.turnTimeLimit}
+                    onChange={(e) => setLocalSettings({ ...localSettings, turnTimeLimit: parseInt(e.target.value) })}
+                    className="w-full accent-indigo-500 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
+                />
+                <div className="flex justify-between text-xs text-zinc-500 mt-1">
+                    <span>10s</span><span>60s</span>
+                </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-between gap-4 border-t border-zinc-700 pt-6 items-center">
+                <div className="flex flex-col gap-3 items-start">
+                    <button
+                        onClick={handleEndGame}
+                        className="text-amber-500 text-sm hover:text-amber-400 font-bold"
+                    >
+                        🛑 End Story
+                    </button>
+                    <button
+                        onClick={handleClearPlayers}
+                        className="text-red-500 text-sm hover:text-red-400 hover:bg-red-950/30 px-2 py-1 -ml-2 rounded"
+                    >
+                        ⚠️ Clear All Players
+                    </button>
+                </div>
+
+                <div className="flex gap-3 w-full sm:w-auto justify-end">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 rounded-lg font-bold hover:bg-zinc-700 text-zinc-300 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-colors"
+                    >
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+        );
+}
+
+        function Leaderboard({players, currentPlayerId}: {players: Record<string, any>, currentPlayerId: string | null }) {
+    const sortedPlayers = Object.values(players)
+        .filter((p: any) => p.isActive)
+        .sort((a: any, b: any) => {
+            const timeA = a.totalResponseTime || 0;
+        const timeB = b.totalResponseTime || 0;
+        if (timeA !== timeB) return timeA - timeB; // ASC
+        return (a.turnCount || 0) - (b.turnCount || 0);
+        });
+
+        return (
+        <div className="bg-zinc-800/30 rounded-xl p-4 border border-zinc-700/50 flex flex-col h-full">
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-300">
+                <span>🏆</span> LEADERBOARD
+            </h2>
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                {sortedPlayers.map((player: any, index: number) => {
+                    const isCurrent = player.id === currentPlayerId;
+                    const totalSeconds = ((player.totalResponseTime || 0) / 1000).toFixed(1);
+
+                    return (
+                        <div
+                            key={player.id}
+                            className={`flex items-center justify-between p-2 rounded-lg border transition-all text-sm ${isCurrent
+                                ? "bg-zinc-700 border-zinc-500 shadow-md transform scale-102"
+                                : "bg-zinc-800/50 border-zinc-700/30"
+                                }`}
+                        >
+                            <div className="flex items-center gap-2 overflow-hidden">
+                                <span className="font-mono text-zinc-600 w-4 text-right text-xs">
+                                    {index + 1}.
+                                </span>
+                                <div
+                                    className="w-2 h-2 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: player.color }}
+                                />
+                                <span className={`truncate max-w-[100px] font-bold ${isCurrent ? "text-white" : "text-zinc-400"}`}>
+                                    {player.name}
+                                </span>
+                            </div>
+                            <div className="font-mono text-indigo-400 font-bold text-xs">
+                                {totalSeconds}s
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+        );
 }

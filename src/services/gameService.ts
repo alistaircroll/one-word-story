@@ -71,12 +71,11 @@ export const gameService = {
 
         let assignedColor: string = PLAYER_COLORS[0];
 
-        // transaction to ensure we don't exceed max players or duplicate colors race
-        // Note: This transaction is on the entire 'players' node. 
-        // For 20 players this is fine. For 1000 it would be bad.
         try {
             await import("firebase/database").then(({ runTransaction }) => {
                 return runTransaction(playersRef, (currentPlayers) => {
+                    const now = Date.now();
+
                     if (currentPlayers === null) {
                         // First player
                         const p: Player = {
@@ -84,39 +83,47 @@ export const gameService = {
                             name: playerName.substring(0, GAME_RULES.MAX_NAME_LENGTH),
                             color: PLAYER_COLORS[0],
                             isActive: true,
-                            lastSeen: Date.now()
+                            lastSeen: now,
+                            totalResponseTime: 0,
+                            turnCount: 0,
+                            lastTurnTime: null
                         };
                         assignedColor = p.color;
                         return { [newPlayerId]: p };
                     }
 
-                    // Re-joining player logic should ideally handle outside, but let's see
                     if (currentPlayers[newPlayerId]) {
-                        // Already exists, just update active status and name
-                        // We return the existing color
+                        // Re-joining
                         assignedColor = currentPlayers[newPlayerId].color;
                         currentPlayers[newPlayerId].isActive = true;
-                        currentPlayers[newPlayerId].lastSeen = Date.now();
+                        currentPlayers[newPlayerId].lastSeen = now;
                         currentPlayers[newPlayerId].name = playerName.substring(0, GAME_RULES.MAX_NAME_LENGTH);
                         return currentPlayers;
                     }
 
                     // New Player
                     const count = Object.keys(currentPlayers).length;
-                    if (count >= GAME_RULES.MAX_PLAYERS) {
-                        console.error("Game full");
-                        return; // Abort transaction
-                    }
+                    if (count >= GAME_RULES.MAX_PLAYERS) return; // Abort
 
                     const colorIndex = count % PLAYER_COLORS.length;
                     assignedColor = PLAYER_COLORS[colorIndex];
+
+                    // Late-joiner Fairness
+                    // Start with max(totalResponseTime) of active players
+                    const activePlayers = Object.values(currentPlayers).filter((p: any) => p.isActive) as Player[];
+                    const maxTime = activePlayers.length > 0
+                        ? Math.max(...activePlayers.map(p => p.totalResponseTime || 0))
+                        : 0;
 
                     currentPlayers[newPlayerId] = {
                         id: newPlayerId,
                         name: playerName.substring(0, GAME_RULES.MAX_NAME_LENGTH),
                         color: assignedColor,
                         isActive: true,
-                        lastSeen: Date.now()
+                        lastSeen: now,
+                        totalResponseTime: maxTime,
+                        turnCount: 0,
+                        lastTurnTime: null
                     };
 
                     return currentPlayers;
@@ -138,11 +145,9 @@ export const gameService = {
             runTransaction(gameRef, (game) => {
                 if (!game) return null;
 
-                // Only add to bag if game is playing and player not already in bag
                 if (game.status === "PLAYING") {
                     const bag = game.turnBag || [];
                     if (!bag.includes(playerId) && game.currentPlayerId !== playerId) {
-                        // Insert at random position in bag
                         const insertPos = Math.floor(Math.random() * (bag.length + 1));
                         bag.splice(insertPos, 0, playerId);
                         game.turnBag = bag;
@@ -155,19 +160,13 @@ export const gameService = {
     },
 
     async startGame(gameId: string) {
-        // Trigger the first turn!
-        // We need to fetch current players first
         const playersRef = ref(db, `games/${gameId}/players`);
         const snapshot = await get(playersRef);
         const players = snapshot.val() || {};
         const playerIds = Object.keys(players).filter(key => players[key].isActive);
 
-        if (playerIds.length < 2) { // Should be GAME_RULES.MIN_PLAYERS
-            console.error("Not enough players");
-            return;
-        }
+        if (playerIds.length < 2) return;
 
-        // Initial shuffle
         const shuffled = playerIds.sort(() => Math.random() - 0.5);
         const firstPlayer = shuffled[0];
         const remainingBag = shuffled.slice(1);
@@ -176,8 +175,8 @@ export const gameService = {
             status: "PLAYING",
             currentPlayerId: firstPlayer,
             turnBag: remainingBag,
-            lastPlayerId: null, // First turn has no previous player
-            timer: 30, // Default turn time (should come from settings)
+            lastPlayerId: null,
+            timer: 30,
             timerStartedAt: Date.now()
         };
 
@@ -186,7 +185,6 @@ export const gameService = {
     },
 
     async resumeGame(gameId: string) {
-        // Resume a paused game - pick next turn without full reshuffle
         const gameRef = ref(db, `games/${gameId}`);
         const snapshot = await get(gameRef);
         const game = snapshot.val();
@@ -196,12 +194,8 @@ export const gameService = {
         const players = game.players || {};
         const activeIds = Object.keys(players).filter(id => players[id].isActive);
 
-        if (activeIds.length < 2) {
-            console.error("Not enough players to resume");
-            return;
-        }
+        if (activeIds.length < 2) return;
 
-        // Pick a random player to go next
         const shuffled = activeIds.sort(() => Math.random() - 0.5);
 
         const updates: any = {
@@ -215,15 +209,122 @@ export const gameService = {
         await update(gameRef, updates);
     },
 
-    async nextTurn(gameId: string) {
+
+    // Updated signature for internal use or direct use
+    async forceNextTurn(gameId: string, penalize: boolean = false) {
         const gameRef = ref(db, `games/${gameId}`);
-        const { GAME_SETTINGS } = await import("@/lib/constants");
+        await import("firebase/database").then(({ runTransaction }) => {
+            runTransaction(gameRef, (game) => {
+                if (!game) return null;
+
+                const players = game.players || {};
+                const activeIds = Object.keys(players).filter(id => players[id].isActive);
+
+                // Penalty Logic
+                if (penalize && game.currentPlayerId && players[game.currentPlayerId]) {
+                    const p = players[game.currentPlayerId];
+                    const penaltyTime = (game.settings?.turnTimeLimit || 30) * 1000;
+                    p.totalResponseTime = (p.totalResponseTime || 0) + penaltyTime;
+                    p.turnCount = (p.turnCount || 0) + 1;
+                    p.lastTurnTime = penaltyTime;
+                }
+
+                if (activeIds.length < 2) {
+                    game.status = "PAUSED";
+                    game.currentPlayerId = null;
+                    return game;
+                }
+
+                let nextBag = game.turnBag || [];
+                if (!Array.isArray(nextBag) || nextBag.length === 0) {
+                    nextBag = activeIds.sort(() => Math.random() - 0.5);
+                    if (game.currentPlayerId && nextBag[0] === game.currentPlayerId && nextBag.length > 1) {
+                        [nextBag[0], nextBag[1]] = [nextBag[1], nextBag[0]];
+                    }
+                }
+                nextBag = nextBag.filter((id: string) => players[id]?.isActive);
+                if (nextBag.length === 0) nextBag = activeIds.sort(() => Math.random() - 0.5);
+
+                const nextPlayerId = nextBag.shift();
+                game.currentPlayerId = nextPlayerId;
+                game.turnBag = nextBag;
+                game.lastPlayerId = game.currentPlayerId;
+                game.timerStartedAt = Date.now();
+                game.timer = game.settings?.turnTimeLimit || 30;
+
+                return game;
+            });
+        });
+    },
+
+    // Alias for old calls (no penalty by default? Or should skip be penalty?)
+    // "On timeout/skip: Use full turnTimeLimit"
+    // So manual skip (button) IS a penalty.
+    async nextTurn(gameId: string) {
+        return this.forceNextTurn(gameId, true);
+    },
+
+    async submitWords(gameId: string, playerId: string, text: string) {
+        const { v4: uuidv4 } = await import("uuid");
+
+        // 1. Calculate Response Time
+        // We need to fetch game state first to get timerStartedAt
+        // Can we do this inside the transaction? Yes.
+
+        const gameRef = ref(db, `games/${gameId}`);
 
         await import("firebase/database").then(({ runTransaction }) => {
             runTransaction(gameRef, (game) => {
                 if (!game) return null;
 
-                // Logic to pick next player
+                // --- STATS UPDATE ---
+                const now = Date.now();
+                const start = game.timerStartedAt || now;
+                const responseTime = now - start;
+
+                if (game.players && game.players[playerId]) {
+                    const p = game.players[playerId];
+                    p.totalResponseTime = (p.totalResponseTime || 0) + responseTime;
+                    p.turnCount = (p.turnCount || 0) + 1;
+                    p.lastTurnTime = responseTime;
+                }
+
+                // --- STORY UPDATE ---
+                if (!game.story) game.story = [];
+                const story = game.story;
+
+                // Capitalization Logic
+                let finalText = text.trim();
+                // ... (simplified cap logic reuse) ...
+                if (finalText.length > 0) {
+                    const lastSegment = story.length > 0 ? story[story.length - 1] : null;
+                    const lastChar = lastSegment ? lastSegment.text.trim().slice(-1) : null;
+                    const shouldCapitalize = !lastSegment || ['.', '!', '?', ':'].includes(lastChar);
+                    if (shouldCapitalize) finalText = finalText.charAt(0).toUpperCase() + finalText.slice(1);
+                    else finalText = finalText.charAt(0).toLowerCase() + finalText.slice(1);
+                }
+
+                story.push({
+                    id: uuidv4(),
+                    text: finalText,
+                    authorId: playerId,
+                    color: game.players[playerId]?.color || "#000",
+                    timestamp: now,
+                    metadata: {
+                        responseTime: responseTime
+                    }
+                });
+
+                // --- NEXT TURN LOGIC (INLINED OR CALLED?) ---
+                // Cannot call async 'this.forceNextTurn' inside transaction.
+                // Must do logic here.
+
+                // Duplicate nextTurn logic here? 
+                // Alternatively, submitWords updates story/stats, then calls nextTurn separately?
+                // But nextTurn needs to know NOT to penalize.
+                // If I separate them, there's a race condition where stats update but turn doesn't?
+                // Ideally do it all in one transaction.
+
                 const players = game.players || {};
                 const activeIds = Object.keys(players).filter(id => players[id].isActive);
 
@@ -234,89 +335,24 @@ export const gameService = {
                 }
 
                 let nextBag = game.turnBag || [];
-
-                // If bag is empty or invalid, refill
                 if (!Array.isArray(nextBag) || nextBag.length === 0) {
-                    // Refill with all active players
                     nextBag = activeIds.sort(() => Math.random() - 0.5);
-
-                    // Continuity check: Don't let same player go twice if possible
                     if (game.currentPlayerId && nextBag[0] === game.currentPlayerId && nextBag.length > 1) {
-                        // Swap first and second
                         [nextBag[0], nextBag[1]] = [nextBag[1], nextBag[0]];
                     }
                 }
-
-                // Filter out any players in the bag who might have disconnected since shuffle
                 nextBag = nextBag.filter((id: string) => players[id]?.isActive);
+                if (nextBag.length === 0) nextBag = activeIds.sort(() => Math.random() - 0.5);
 
-                // If filtering emptied it again, just recurse-ish (or fail safe)
-                if (nextBag.length === 0) {
-                    // Emergency refill
-                    nextBag = activeIds.sort(() => Math.random() - 0.5);
-                }
-
-                const nextPlayerId = nextBag.shift();
-
-                game.currentPlayerId = nextPlayerId;
+                game.currentPlayerId = nextBag.shift();
                 game.turnBag = nextBag;
                 game.lastPlayerId = game.currentPlayerId;
                 game.timerStartedAt = Date.now();
-
-                // Reset timer duration (could be dynamic in future)
                 game.timer = game.settings?.turnTimeLimit || 30;
 
                 return game;
             });
         });
-    },
-
-    async submitWords(gameId: string, playerId: string, text: string) {
-        const { v4: uuidv4 } = await import("uuid");
-
-        // 1. Add story segment
-        // We use runTransaction on the story array to safely append
-        const storyRef = ref(db, `games/${gameId}/story`);
-        // Snapshot to get current player color
-        const playerRef = ref(db, `games/${gameId}/players/${playerId}`);
-        const playerSnap = await get(playerRef);
-        const playerColor = playerSnap.exists() ? playerSnap.val().color : "#000000";
-
-        await import("firebase/database").then(({ runTransaction }) => {
-            runTransaction(storyRef, (story: any[]) => { // basic typing for internal block
-                if (!story) story = [];
-
-                // Capitalization Logic
-                let finalText = text.trim();
-                if (finalText.length > 0) {
-                    const lastSegment = story.length > 0 ? story[story.length - 1] : null;
-                    const lastChar = lastSegment ? lastSegment.text.trim().slice(-1) : null;
-
-                    // Capitalize if: Start of story OR Previous ended with . ? ! : OR Previous was empty (edge case)
-                    const shouldCapitalize = !lastSegment || ['.', '!', '?', ':'].includes(lastChar);
-
-                    if (shouldCapitalize) {
-                        finalText = finalText.charAt(0).toUpperCase() + finalText.slice(1);
-                    } else {
-                        // Force lowercase to override mobile keyboard auto-capitalization
-                        finalText = finalText.charAt(0).toLowerCase() + finalText.slice(1);
-                    }
-                }
-
-                story.push({
-                    id: uuidv4(),
-                    text: finalText,
-                    authorId: playerId,
-                    color: playerColor,
-                    timestamp: Date.now()
-                });
-
-                return story;
-            });
-        });
-
-        // 2. Advance turn
-        await this.nextTurn(gameId);
     },
 
     async leaveGame(gameId: string, playerId: string) {

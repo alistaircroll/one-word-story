@@ -39,3 +39,8 @@ export const PLAYER_COLORS = [
     '#C4B5FD', // Violet (brighter)
     '#5EEAD4', // Cyan (brighter)
 ] as const;
+
+export const LEADERBOARD = {
+    FAST_THRESHOLD_MS: 5000,      // <= 5 seconds
+    VERY_FAST_THRESHOLD_MS: 2000, // <= 2 seconds
+} as const;

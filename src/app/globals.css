@@ -40,3 +40,36 @@ body {
 .animate-fade-in {
   animation: fadeIn 0.8s ease-out forwards;
 }
+
+/* LEADERBOARD FX */
+.segment-very-fast {
+  animation: very-fast-glow 1s ease-out;
+}
+
+.segment-fast {
+  animation: fast-pulse 0.8s ease-out;
+}
+
+@keyframes very-fast-glow {
+  0% {
+    text-shadow: 0 0 20px #fbbf24, 0 0 40px #fbbf24;
+    background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.3), transparent);
+  }
+
+  100% {
+    text-shadow: none;
+    background: transparent;
+  }
+}
+
+@keyframes fast-pulse {
+  0% {
+    filter: brightness(1.5);
+    transform: scale(1.1);
+  }
+
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+}
