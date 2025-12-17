@@ -33,6 +33,19 @@ export default function HostGamePage() {
         return () => unsubscribe();
     }, [gameId]);
 
+    // Auto-Pause Monitor
+    useEffect(() => {
+        if (!gameState || gameState.status !== "PLAYING") return;
+
+        const players = gameState.players || {};
+        const activeCount = Object.values(players).filter(p => p.isActive).length;
+
+        if (activeCount < GAME_RULES.MIN_PLAYERS) {
+            // We (the host) trigger the pause
+            gameService.pauseGame(gameId);
+        }
+    }, [gameState, gameId]);
+
     if (loading) {
         return (
             <div className="flex h-screen items-center justify-center bg-zinc-900 text-white">

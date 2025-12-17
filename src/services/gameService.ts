@@ -268,6 +268,32 @@ export const gameService = {
     async leaveGame(gameId: string, playerId: string) {
         const playerRef = ref(db, `games/${gameId}/players/${playerId}`);
         await update(playerRef, { isActive: false });
-        // TODO: functionality to auto-pause if falling below min players will be in nextTurn or separate listener
+    },
+
+    // Presence & Heartbeat
+    async setupPresence(gameId: string, playerId: string) {
+        const { onDisconnect } = await import("firebase/database");
+
+        const playerRef = ref(db, `games/${gameId}/players/${playerId}`);
+        const connectedRef = ref(db, ".info/connected");
+
+        // When I disconnect, set isActive to false
+        onDisconnect(playerRef).update({
+            isActive: false,
+            lastSeen: Date.now()
+        });
+
+        // Optional: Manage connection state locally if needed
+        // but the server-side onDisconnect is the key safety net.
+    },
+
+    async heartbeat(gameId: string, playerId: string) {
+        const playerRef = ref(db, `games/${gameId}/players/${playerId}`);
+        await update(playerRef, { lastSeen: Date.now(), isActive: true });
+    },
+
+    async pauseGame(gameId: string) {
+        const gameRef = ref(db, `games/${gameId}`);
+        await update(gameRef, { status: "PAUSED" });
     }
 };

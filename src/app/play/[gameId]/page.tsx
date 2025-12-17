@@ -7,6 +7,7 @@ import { gameService } from "@/services/gameService";
 import { GameState, Player } from "@/types";
 import { ref, get, child } from "firebase/database";
 import { db } from "@/lib/firebase";
+import { GAME_RULES, TIMERS } from "@/lib/constants";
 
 // We need to wrap the logic in a component that uses useSearchParams inside Suspense
 function PlayerLogic() {
@@ -69,7 +70,23 @@ function PlayerLogic() {
         };
 
         checkPlayer();
+        checkPlayer();
     }, [playerId, gameId]);
+
+    // 2.5 Setup Presence & Heartbeat
+    useEffect(() => {
+        if (!gameId || !playerId || !playerData) return;
+
+        // Set up disconnect handler
+        gameService.setupPresence(gameId, playerId);
+
+        // Heartbeat interval
+        const interval = setInterval(() => {
+            gameService.heartbeat(gameId, playerId);
+        }, TIMERS.HEARTBEAT_INTERVAL);
+
+        return () => clearInterval(interval);
+    }, [gameId, playerId, playerData?.id]); // Only run once we are identified
 
     // 3. Subscribe to Game State
     useEffect(() => {
