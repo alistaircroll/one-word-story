@@ -86,6 +86,9 @@ function LobbyView({ gameId, gameState }: { gameId: string, gameState: GameState
     const playerCount = activePlayers.length;
     const canStart = playerCount >= GAME_RULES.MIN_PLAYERS;
 
+    // Settings State
+    const [showSettings, setShowSettings] = useState(false);
+
     // We need the full URL for the QR code
     // In dev: http://localhost:3000/join/GAMEID
     // We can use window.location.origin
@@ -155,8 +158,11 @@ function LobbyView({ gameId, gameState }: { gameId: string, gameState: GameState
                     </div>
 
                     <div className="flex gap-4">
-                        {/* Settings placeholders */}
-                        <button className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-4 rounded-lg font-bold border border-zinc-700">
+                        {/* Settings Button */}
+                        <button
+                            onClick={() => setShowSettings(true)}
+                            className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-4 rounded-lg font-bold border border-zinc-700"
+                        >
                             Settings ⚙
                         </button>
 
@@ -174,6 +180,13 @@ function LobbyView({ gameId, gameState }: { gameId: string, gameState: GameState
                 </div>
 
             </div>
+
+            <SettingsModal
+                gameId={gameId}
+                settings={gameState.settings}
+                isOpen={showSettings}
+                onClose={() => setShowSettings(false)}
+            />
         </div>
     );
 }
@@ -203,6 +216,10 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
     const currentPlayer = gameState.currentPlayerId ? players[gameState.currentPlayerId] : null;
     const story = gameState.story || [];
     const timeLeft = useGameTimer(gameState);
+
+    // Editing State
+    const [showSettings, setShowSettings] = useState(false);
+    const [editingSegment, setEditingSegment] = useState<{ id: string, text: string } | null>(null);
 
     // QR Code URL
     const [origin, setOrigin] = useState("");
@@ -238,7 +255,9 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                                 {currentPlayer.name}
                             </div>
                         ) : (
-                            <div className="text-xl font-bold text-zinc-500">PAUSED</div>
+                            <div className="text-xl font-bold text-zinc-500">
+                                {gameState.status === "ENDED" ? "THE END" : "PAUSED"}
+                            </div>
                         )}
                     </div>
 
@@ -261,8 +280,9 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                                 <span
                                     key={segment.id}
                                     style={{ color: segment.color }}
-                                    className="hover:bg-zinc-800/50 rounded transition-colors cursor-pointer"
-                                    title={`By ${players[segment.authorId]?.name || "Unknown"}`}
+                                    className="hover:bg-zinc-800/50 rounded transition-colors cursor-pointer border-b-2 border-transparent hover:border-zinc-700"
+                                    title={`By ${players[segment.authorId]?.name || "Unknown"} (Click to edit)`}
+                                    onClick={() => setEditingSegment({ id: segment.id, text: segment.text })}
                                 >
                                     {segment.text}{" "}
                                 </span>
@@ -291,6 +311,12 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
 
             {/* Host Controls */}
             <div className="p-6 border-t border-zinc-800 bg-zinc-900 flex justify-center gap-4">
+                <button
+                    onClick={() => setShowSettings(true)}
+                    className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-3 rounded-lg font-bold border border-zinc-700 transition-colors"
+                >
+                    ⚙
+                </button>
                 {gameState.status === "PAUSED" ? (
                     <>
                         {Object.values(players).filter(p => p.isActive).length >= 2 ? (
@@ -314,6 +340,154 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                         Skip Player
                     </button>
                 )}
+            </div>
+
+            {/* Edit Modal */}
+            {editingSegment && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-zinc-800 p-8 rounded-xl max-w-lg w-full border border-zinc-700 shadow-2xl">
+                        <h2 className="text-xl font-bold mb-4">Edit Story Segment</h2>
+                        <input
+                            type="text"
+                            value={editingSegment.text}
+                            onChange={(e) => setEditingSegment({ ...editingSegment, text: e.target.value })}
+                            className="w-full bg-zinc-900 border border-zinc-700 rounded p-4 text-xl mb-8 focus:ring-2 focus:ring-indigo-500 outline-none font-serif text-white/90"
+                            autoFocus
+                        />
+                        <div className="flex justify-between gap-4">
+                            <button
+                                onClick={() => {
+                                    if (confirm("Permanently delete this part of the story?")) {
+                                        gameService.deleteStorySegment(gameId, editingSegment.id);
+                                        setEditingSegment(null);
+                                    }
+                                }}
+                                className="bg-red-900/30 hover:bg-red-900/50 text-red-200 px-4 py-3 rounded-lg font-bold border border-red-800/50 transition-colors"
+                            >
+                                Delete
+                            </button>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setEditingSegment(null)}
+                                    className="px-6 py-3 rounded-lg font-bold hover:bg-zinc-700 text-zinc-300 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        gameService.updateStorySegment(gameId, editingSegment.id, editingSegment.text);
+                                        setEditingSegment(null);
+                                    }}
+                                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-lg font-bold shadow-lg transition-colors"
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <SettingsModal
+                gameId={gameId}
+                settings={gameState.settings}
+                isOpen={showSettings}
+                onClose={() => setShowSettings(false)}
+            />
+        </div>
+    );
+}
+
+function SettingsModal({ gameId, settings, isOpen, onClose }: { gameId: string, settings: any, isOpen: boolean, onClose: () => void }) {
+    const [localSettings, setLocalSettings] = useState(settings || { wordLimit: 3, turnTimeLimit: 30 });
+
+    useEffect(() => {
+        if (isOpen && settings) setLocalSettings(settings);
+    }, [isOpen, settings]);
+
+    if (!isOpen) return null;
+
+    const handleSave = () => {
+        gameService.updateSettings(gameId, localSettings);
+        onClose();
+    };
+
+    const handleEndGame = () => {
+        if (confirm("End the story here? Players won't be able to add more words.")) {
+            gameService.endGame(gameId);
+            onClose();
+        }
+    };
+
+    const handleClearPlayers = () => {
+        if (confirm("NUCLEAR OPTION: This will kick EVERYONE out of the game. Are you sure?")) {
+            gameService.clearPlayers(gameId);
+            onClose();
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="bg-zinc-800 p-8 rounded-xl max-w-md w-full border border-zinc-700 shadow-2xl">
+                <h2 className="text-xl font-bold mb-6 text-white">Game Settings</h2>
+
+                <div className="mb-6">
+                    <label className="block text-zinc-400 mb-2">Maximum Words per Turn: <span className="text-white font-bold">{localSettings.wordLimit}</span></label>
+                    <input
+                        type="range" min="1" max="5" step="1"
+                        value={localSettings.wordLimit}
+                        onChange={(e) => setLocalSettings({ ...localSettings, wordLimit: parseInt(e.target.value) })}
+                        className="w-full accent-indigo-500 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-zinc-500 mt-1">
+                        <span>1</span><span>5</span>
+                    </div>
+                </div>
+
+                <div className="mb-8">
+                    <label className="block text-zinc-400 mb-2">Turn Timer (Seconds): <span className="text-white font-bold">{localSettings.turnTimeLimit}s</span></label>
+                    <input
+                        type="range" min="10" max="60" step="5"
+                        value={localSettings.turnTimeLimit}
+                        onChange={(e) => setLocalSettings({ ...localSettings, turnTimeLimit: parseInt(e.target.value) })}
+                        className="w-full accent-indigo-500 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-zinc-500 mt-1">
+                        <span>10s</span><span>60s</span>
+                    </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row justify-between gap-4 border-t border-zinc-700 pt-6 items-center">
+                    <div className="flex flex-col gap-3 items-start">
+                        <button
+                            onClick={handleEndGame}
+                            className="text-amber-500 text-sm hover:text-amber-400 font-bold"
+                        >
+                            🛑 End Story
+                        </button>
+                        <button
+                            onClick={handleClearPlayers}
+                            className="text-red-500 text-sm hover:text-red-400 hover:bg-red-950/30 px-2 py-1 -ml-2 rounded"
+                        >
+                            ⚠️ Clear All Players
+                        </button>
+                    </div>
+
+                    <div className="flex gap-3 w-full sm:w-auto justify-end">
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 rounded-lg font-bold hover:bg-zinc-700 text-zinc-300 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-colors"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );

@@ -349,5 +349,48 @@ export const gameService = {
     async pauseGame(gameId: string) {
         const gameRef = ref(db, `games/${gameId}`);
         await update(gameRef, { status: "PAUSED" });
+    },
+
+    async endGame(gameId: string) {
+        const gameRef = ref(db, `games/${gameId}`);
+        await update(gameRef, { status: "ENDED", currentPlayerId: null });
+    },
+
+    async updateStorySegment(gameId: string, segmentId: string, newText: string) {
+        const gameRef = ref(db, `games/${gameId}`);
+        await import("firebase/database").then(({ runTransaction }) => {
+            runTransaction(gameRef, (game) => {
+                if (!game || !game.story) return game;
+
+                const segmentIndex = game.story.findIndex((s: any) => s.id === segmentId);
+                if (segmentIndex !== -1) {
+                    game.story[segmentIndex].text = newText;
+                }
+                return game;
+            });
+        });
+    },
+
+    async deleteStorySegment(gameId: string, segmentId: string) {
+        const gameRef = ref(db, `games/${gameId}`);
+        await import("firebase/database").then(({ runTransaction }) => {
+            runTransaction(gameRef, (game) => {
+                if (!game || !game.story) return game;
+
+                // Filter out the deleted segment
+                game.story = game.story.filter((s: any) => s.id !== segmentId);
+                return game;
+            });
+        });
+    },
+
+    async updateSettings(gameId: string, settings: any) {
+        const gameRef = ref(db, `games/${gameId}/settings`);
+        await update(gameRef, settings);
+    },
+
+    async clearPlayers(gameId: string) {
+        const playersRef = ref(db, `games/${gameId}/players`);
+        await set(playersRef, null);
     }
 };
