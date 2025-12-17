@@ -291,12 +291,29 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
 
             {/* Host Controls */}
             <div className="p-6 border-t border-zinc-800 bg-zinc-900 flex justify-center gap-4">
-                <button
-                    onClick={() => gameService.nextTurn(gameId)}
-                    className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-lg font-bold border border-zinc-700 transition-colors"
-                >
-                    Skip Player
-                </button>
+                {gameState.status === "PAUSED" ? (
+                    <>
+                        {Object.values(players).filter(p => p.isActive).length >= 2 ? (
+                            <button
+                                onClick={() => gameService.resumeGame(gameId)}
+                                className="bg-green-600 hover:bg-green-500 text-white px-8 py-4 rounded-lg font-bold text-lg shadow-lg transition-all"
+                            >
+                                ▶ Resume Game
+                            </button>
+                        ) : (
+                            <div className="text-amber-500 font-bold">
+                                Waiting for more players to resume...
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <button
+                        onClick={() => gameService.nextTurn(gameId)}
+                        className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-lg font-bold border border-zinc-700 transition-colors"
+                    >
+                        Skip Player
+                    </button>
+                )}
             </div>
         </div>
     );

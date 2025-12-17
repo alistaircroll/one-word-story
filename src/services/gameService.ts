@@ -130,6 +130,30 @@ export const gameService = {
         return { playerId: newPlayerId, color: assignedColor };
     },
 
+    // Add late-joiner to turn bag if game is playing
+    async addToTurnBag(gameId: string, playerId: string) {
+        const gameRef = ref(db, `games/${gameId}`);
+
+        await import("firebase/database").then(({ runTransaction }) => {
+            runTransaction(gameRef, (game) => {
+                if (!game) return null;
+
+                // Only add to bag if game is playing and player not already in bag
+                if (game.status === "PLAYING") {
+                    const bag = game.turnBag || [];
+                    if (!bag.includes(playerId) && game.currentPlayerId !== playerId) {
+                        // Insert at random position in bag
+                        const insertPos = Math.floor(Math.random() * (bag.length + 1));
+                        bag.splice(insertPos, 0, playerId);
+                        game.turnBag = bag;
+                    }
+                }
+
+                return game;
+            });
+        });
+    },
+
     async startGame(gameId: string) {
         // Trigger the first turn!
         // We need to fetch current players first
@@ -158,6 +182,36 @@ export const gameService = {
         };
 
         const gameRef = ref(db, `games/${gameId}`);
+        await update(gameRef, updates);
+    },
+
+    async resumeGame(gameId: string) {
+        // Resume a paused game - pick next turn without full reshuffle
+        const gameRef = ref(db, `games/${gameId}`);
+        const snapshot = await get(gameRef);
+        const game = snapshot.val();
+
+        if (!game) return;
+
+        const players = game.players || {};
+        const activeIds = Object.keys(players).filter(id => players[id].isActive);
+
+        if (activeIds.length < 2) {
+            console.error("Not enough players to resume");
+            return;
+        }
+
+        // Pick a random player to go next
+        const shuffled = activeIds.sort(() => Math.random() - 0.5);
+
+        const updates: any = {
+            status: "PLAYING",
+            currentPlayerId: shuffled[0],
+            turnBag: shuffled.slice(1),
+            timerStartedAt: Date.now(),
+            timer: game.settings?.turnTimeLimit || 30
+        };
+
         await update(gameRef, updates);
     },
 

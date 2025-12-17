@@ -118,6 +118,33 @@ function PlayerLogic() {
         return () => clearInterval(interval);
     }, [gameState?.timerStartedAt, gameState?.status, gameState?.settings?.turnTimeLimit]);
 
+    // 5. Sound & Vibration when it's my turn
+    useEffect(() => {
+        const isMyTurn = gameState?.currentPlayerId === playerId;
+        if (isMyTurn && gameState?.status === "PLAYING") {
+            // Vibration (if supported)
+            if (navigator.vibrate) {
+                navigator.vibrate([200, 100, 200]); // Pattern: vibrate, pause, vibrate
+            }
+            // Sound (simple beep using Web Audio API)
+            try {
+                const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.frequency.value = 880; // A5 note
+                oscillator.type = 'sine';
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            } catch (e) {
+                // Audio not supported, ignore
+            }
+        }
+    }, [gameState?.currentPlayerId, playerId, gameState?.status]);
+
 
     const handleSubmitName = async () => {
         if (!playerName.trim() || !gameId || !playerId) return;
@@ -125,6 +152,8 @@ function PlayerLogic() {
         setLoading(true);
         try {
             const { color } = await gameService.joinGame(gameId, playerName, playerId);
+            // Add late-joiner to turn bag if game is already playing
+            await gameService.addToTurnBag(gameId, playerId);
             // Optimistic update
             setPlayerData({
                 id: playerId,
