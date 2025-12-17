@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { gameService } from "@/services/gameService";
@@ -204,6 +204,19 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
     const story = gameState.story || [];
     const timeLeft = useGameTimer(gameState);
 
+    // QR Code URL
+    const [origin, setOrigin] = useState("");
+    useEffect(() => {
+        setOrigin(window.location.origin);
+    }, []);
+    const joinUrl = `${origin}/join/${gameId}`;
+
+    // Auto-scroll story
+    const storyEndRef = React.useRef<HTMLSpanElement>(null);
+    useEffect(() => {
+        storyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [story.length]);
+
     return (
         <div className="min-h-screen bg-zinc-900 text-white flex flex-col">
             {/* Top Bar */}
@@ -229,48 +242,62 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                         )}
                     </div>
 
-                    {/* Timer placeholder */}
+                    {/* Timer */}
                     <div className={`w-16 h-16 rounded-full flex items-center justify-center border-4 text-xl font-bold font-mono ${timeLeft < 10 ? 'bg-red-900 border-red-700 animate-pulse' : 'bg-zinc-800 border-zinc-700'}`}>
                         {Math.ceil(timeLeft)}
                     </div>
                 </div>
             </div>
-            {/* Story Area */}
-            <div className="flex-1 p-8 sm:p-16 max-w-5xl mx-auto w-full">
-                <div className="text-4xl sm:text-5xl leading-relaxed font-serif text-zinc-300">
-                    {story.length === 0 ? (
-                        <span className="text-zinc-700 italic">Once upon a time...</span>
-                    ) : (
-                        story.map((segment) => (
-                            <span
-                                key={segment.id}
-                                style={{ color: segment.color }}
-                                className="hover:bg-zinc-800/50 rounded transition-colors cursor-pointer"
-                                title={`By ${players[segment.authorId]?.name || "Unknown"}`}
-                            >
-                                {segment.text}{" "}
-                            </span>
-                        ))
-                    )}
 
-                    {/* Cursor for current player */}
-                    {currentPlayer && (
-                        <span className="inline-block w-1 h-10 ml-1 translate-y-2 animate-pulse" style={{ backgroundColor: currentPlayer.color }} />
+            {/* Main Content */}
+            <div className="flex-1 flex">
+                {/* Story Area */}
+                <div className="flex-1 p-8 sm:p-16 max-w-5xl mx-auto w-full overflow-auto">
+                    <div className="text-4xl sm:text-5xl leading-relaxed font-serif text-zinc-300">
+                        {story.length === 0 ? (
+                            <span className="text-zinc-700 italic">Once upon a time...</span>
+                        ) : (
+                            story.map((segment) => (
+                                <span
+                                    key={segment.id}
+                                    style={{ color: segment.color }}
+                                    className="hover:bg-zinc-800/50 rounded transition-colors cursor-pointer"
+                                    title={`By ${players[segment.authorId]?.name || "Unknown"}`}
+                                >
+                                    {segment.text}{" "}
+                                </span>
+                            ))
+                        )}
+
+                        {/* Cursor for current player */}
+                        {currentPlayer && (
+                            <span className="inline-block w-1 h-10 ml-1 translate-y-2 animate-pulse" style={{ backgroundColor: currentPlayer.color }} />
+                        )}
+                        <span ref={storyEndRef} />
+                    </div>
+                </div>
+
+                {/* QR Sidebar */}
+                <div className="hidden lg:flex flex-col items-center justify-center p-6 bg-zinc-800/30 border-l border-zinc-800 w-64">
+                    <p className="text-zinc-500 text-xs uppercase tracking-widest mb-2">Join Game</p>
+                    {origin && (
+                        <div className="bg-white p-2 rounded-lg">
+                            <QRCodeSVG value={joinUrl} size={120} />
+                        </div>
                     )}
+                    <p className="text-indigo-400 font-mono font-bold text-2xl mt-3">{gameId}</p>
                 </div>
             </div>
 
             {/* Host Controls */}
             <div className="p-6 border-t border-zinc-800 bg-zinc-900 flex justify-center gap-4">
                 <button
-                    onClick={() => gameService.nextTurn(gameId)} // Manual skip
+                    onClick={() => gameService.nextTurn(gameId)}
                     className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-lg font-bold border border-zinc-700 transition-colors"
                 >
                     Skip Player
                 </button>
-
-                {/* Settings Toggles could go here */}
             </div>
-        </div >
+        </div>
     );
 }

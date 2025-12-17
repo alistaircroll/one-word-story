@@ -102,6 +102,22 @@ function PlayerLogic() {
         return () => unsubscribe();
     }, [gameId, view]); // view dep ensures we only switch if currently waiting
 
+    // 4. Timer calculation
+    useEffect(() => {
+        if (gameState?.status !== "PLAYING" || !gameState.timerStartedAt) {
+            setTimeLeft(0);
+            return;
+        }
+        const tick = () => {
+            const elapsed = (Date.now() - (gameState.timerStartedAt || 0)) / 1000;
+            const remaining = Math.max(0, (gameState.settings?.turnTimeLimit || 30) - elapsed);
+            setTimeLeft(remaining);
+        };
+        tick();
+        const interval = setInterval(tick, 100); // More frequent for smooth progress bar
+        return () => clearInterval(interval);
+    }, [gameState?.timerStartedAt, gameState?.status, gameState?.settings?.turnTimeLimit]);
+
 
     const handleSubmitName = async () => {
         if (!playerName.trim() || !gameId || !playerId) return;
@@ -223,8 +239,30 @@ function PlayerLogic() {
 
     // If it's my turn
     if (view === "PLAYING" && isMyTurn) {
+        const turnDuration = gameState?.settings?.turnTimeLimit || 30;
+        const timerPercent = Math.max(0, Math.min(100, (timeLeft / turnDuration) * 100));
+        const story = gameState?.story || [];
+        const lastWords = story.slice(-10).map(s => s.text).join(' ');
+
         return (
-            <div className="min-h-screen bg-indigo-950 text-white p-6 flex flex-col items-center justify-center">
+            <div className="min-h-screen bg-indigo-950 text-white p-6 flex flex-col items-center justify-center relative overflow-hidden">
+                {/* Progress bar at top */}
+                <div className="absolute top-0 left-0 right-0 h-2 bg-indigo-900">
+                    <div
+                        className={`h-full transition-all duration-100 ${timerPercent < 33 ? 'bg-red-500' : timerPercent < 66 ? 'bg-amber-500' : 'bg-green-500'}`}
+                        style={{ width: `${timerPercent}%` }}
+                    />
+                </div>
+
+                {/* Story context */}
+                {lastWords && (
+                    <div className="absolute top-6 left-0 right-0 px-6">
+                        <p className="text-center text-indigo-300/70 text-lg italic truncate">
+                            ...{lastWords}
+                        </p>
+                    </div>
+                )}
+
                 <div className="animate-bounce mb-6 text-center">
                     <span className="text-6xl">🫵</span>
                 </div>
@@ -264,7 +302,7 @@ function PlayerLogic() {
                     </button>
                     {!canSubmit && wordCount > 0 && (
                         <p className="text-center mt-4 text-indigo-400/80 text-sm">
-                            {wordCount > maxWords ? "Only one word allowed!" : "Type something!"}
+                            {wordCount > maxWords ? `Maximum ${maxWords} word${maxWords > 1 ? 's' : ''} allowed!` : "Type something!"}
                         </p>
                     )}
                 </div>

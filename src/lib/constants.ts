@@ -26,16 +26,16 @@ export const TIMERS = {
 } as const;
 
 export const PLAYER_COLORS = [
-    '#1E40AF', // Blue
-    '#B91C1C', // Red
-    '#047857', // Green
-    '#7C3AED', // Purple
-    '#B45309', // Amber
-    '#0F766E', // Teal
-    '#BE185D', // Pink
-    '#4338CA', // Indigo
-    '#0369A1', // Sky
-    '#A16207', // Yellow-dark
-    '#6D28D9', // Violet
-    '#115E59', // Cyan-dark
+    '#60A5FA', // Blue (brighter)
+    '#F87171', // Red (brighter)
+    '#34D399', // Green (brighter)
+    '#A78BFA', // Purple (brighter)
+    '#FBBF24', // Amber (brighter)
+    '#2DD4BF', // Teal (brighter)
+    '#F472B6', // Pink (brighter)
+    '#818CF8', // Indigo (brighter)
+    '#38BDF8', // Sky (brighter)
+    '#FCD34D', // Yellow (brighter)
+    '#C4B5FD', // Violet (brighter)
+    '#5EEAD4', // Cyan (brighter)
 ] as const;
