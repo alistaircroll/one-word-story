@@ -223,6 +223,11 @@ function PlayerLogic() {
     // WAITING / PLAYING VIEW
     const isMyTurn = gameState?.currentPlayerId === playerId;
     const isPaused = gameState?.status === "PAUSED";
+    const isEnded = gameState?.status === "ENDED";
+
+    // Story Context
+    const story = gameState?.story || [];
+    const lastWords = story.slice(-10).map(s => s.text).join(' ');
 
     // Helper logic
     const countWords = (input: string): number => {
@@ -256,12 +261,35 @@ function PlayerLogic() {
         setInputText(""); // Clear immediately
     };
 
-    // If we are "PLAYING" but game is paused or ended, show that
+    // STATE HANDLING
+
+    if (isEnded) {
+        return (
+            <div className="min-h-screen bg-black text-white p-6 flex flex-col items-center justify-center text-center animate-fade-in">
+                <h1 className="text-6xl font-serif font-bold mb-6 text-indigo-500">THE END.</h1>
+                <p className="text-zinc-400 text-lg mb-8">A masterpiece, surely.</p>
+                <button
+                    onClick={() => router.push('/')}
+                    className="bg-white text-black px-8 py-3 rounded-full font-bold hover:scale-105 transition-transform"
+                >
+                    Back to Home
+                </button>
+            </div>
+        );
+    }
+
     if (isPaused) {
         return (
             <div className="min-h-screen bg-zinc-900 text-white p-6 flex flex-col items-center justify-center text-center">
-                <h2 className="text-2xl font-bold mb-2 text-amber-500">GAME PAUSED</h2>
-                <p className="text-zinc-400">Waiting for players...</p>
+                <h2 className="text-3xl font-bold mb-2 text-amber-500">GAME PAUSED</h2>
+                <div className="w-16 h-1 bg-amber-500 mx-auto mb-6 rounded-full"></div>
+                <p className="text-zinc-300 text-lg">Waiting for the host...</p>
+                {lastWords && (
+                    <div className="mt-8 p-6 bg-zinc-800 rounded-xl border border-zinc-700 max-w-sm">
+                        <p className="text-zinc-500 text-xs uppercase mb-2">Story so far</p>
+                        <p className="text-zinc-400 italic font-serif">"...{lastWords}"</p>
+                    </div>
+                )}
             </div>
         );
     }
@@ -270,8 +298,6 @@ function PlayerLogic() {
     if (view === "PLAYING" && isMyTurn) {
         const turnDuration = gameState?.settings?.turnTimeLimit || 30;
         const timerPercent = Math.max(0, Math.min(100, (timeLeft / turnDuration) * 100));
-        const story = gameState?.story || [];
-        const lastWords = story.slice(-10).map(s => s.text).join(' ');
 
         return (
             <div className="min-h-screen bg-indigo-950 text-white p-6 flex flex-col items-center justify-center relative overflow-hidden">
@@ -348,6 +374,13 @@ function PlayerLogic() {
                     style={{ backgroundColor: playerData?.color }}
                 />
                 <h2 className="text-2xl font-bold mb-2">{playerData?.name}</h2>
+
+                {lastWords && (
+                    <div className="my-6 p-4 bg-zinc-900/50 rounded-lg border border-zinc-700/50">
+                        <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">Latest Story</p>
+                        <p className="text-zinc-300 italic font-serif leading-relaxed">"...{lastWords}"</p>
+                    </div>
+                )}
 
                 {gameState?.status === "PLAYING" ? (
                     <div className="mt-4">
