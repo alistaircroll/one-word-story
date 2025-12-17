@@ -244,6 +244,29 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
         storyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [story.length]);
 
+    // Auto-timeout: Skip player when timer hits 0
+    const hasTimedOut = React.useRef(false);
+    useEffect(() => {
+        // Only auto-skip if:
+        // 1. Game is PLAYING
+        // 2. Timer is at 0 (or very close)
+        // 3. We have a current player
+        // 4. We haven't already triggered this timeout for this turn
+        if (
+            gameState.status === "PLAYING" &&
+            timeLeft <= 0.5 &&
+            gameState.currentPlayerId &&
+            !hasTimedOut.current
+        ) {
+            hasTimedOut.current = true;
+            gameService.nextTurn(gameId);
+        }
+        // Reset the flag when a new turn starts (timerStartedAt changes)
+        if (timeLeft > 1) {
+            hasTimedOut.current = false;
+        }
+    }, [timeLeft, gameState.status, gameState.currentPlayerId, gameId]);
+
     return (
         <div className="min-h-screen bg-zinc-900 text-white flex flex-col">
             {/* Top Bar */}

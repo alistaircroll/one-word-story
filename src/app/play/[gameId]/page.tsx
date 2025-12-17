@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { gameService } from "@/services/gameService";
@@ -34,6 +34,7 @@ function PlayerLogic() {
 
     // Toast State
     const [toast, setToast] = useState<{ visible: boolean, message: string }>({ visible: false, message: "" });
+    const lastToastSegmentId = useRef<string | null>(null); // Prevent duplicate toasts
 
     // 1. Handle ID Generation / URL Sync
     useEffect(() => {
@@ -73,7 +74,6 @@ function PlayerLogic() {
         };
 
         checkPlayer();
-        checkPlayer();
     }, [playerId, gameId]);
 
     // 2.5 Setup Presence & Heartbeat
@@ -110,14 +110,20 @@ function PlayerLogic() {
         if (!gameState?.story || gameState.story.length === 0 || !playerId) return;
 
         const lastSegment = gameState.story[gameState.story.length - 1];
-        // If I wrote it AND it's new ( < 5s ago)
+
+        // Prevent duplicate toasts for the same segment
+        if (lastToastSegmentId.current === lastSegment.id) return;
+
+        // If I wrote it AND it's new (< 5s ago)
         if (lastSegment.authorId === playerId && (Date.now() - lastSegment.timestamp < 5000)) {
             const speed = lastSegment.metadata?.responseTime;
             if (speed) {
                 if (speed <= LEADERBOARD.VERY_FAST_THRESHOLD_MS) {
+                    lastToastSegmentId.current = lastSegment.id;
                     setToast({ visible: true, message: `⚡ ${(speed / 1000).toFixed(1)}s!` });
                     setTimeout(() => setToast({ visible: false, message: "" }), 2500);
                 } else if (speed <= LEADERBOARD.FAST_THRESHOLD_MS) {
+                    lastToastSegmentId.current = lastSegment.id;
                     setToast({ visible: true, message: `🔥 ${(speed / 1000).toFixed(1)}s` });
                     setTimeout(() => setToast({ visible: false, message: "" }), 2500);
                 }
