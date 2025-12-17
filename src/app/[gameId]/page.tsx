@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { gameService } from "@/services/gameService";
-import { GameState, GameStatus } from "@/types";
+import { GameState } from "@/types";
 import { GAME_RULES, LEADERBOARD } from "@/lib/constants";
 
 export default function HostGamePage() {
@@ -309,17 +309,28 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                         {story.length === 0 ? (
                             <span className="text-zinc-700 italic">Once upon a time...</span>
                         ) : (
-                            story.map((segment) => (
-                                <span
-                                    key={segment.id}
-                                    style={{ color: segment.color }}
-                                    className="hover:bg-zinc-800/50 rounded transition-colors cursor-pointer border-b-2 border-transparent hover:border-zinc-700"
-                                    title={`By ${players[segment.authorId]?.name || "Unknown"} (Click to edit)`}
-                                    onClick={() => setEditingSegment({ id: segment.id, text: segment.text })}
-                                >
-                                    {segment.text}{" "}
-                                </span>
-                            ))
+                            story.map((segment) => {
+                                // Visual flair for fast responses
+                                let effectClass = "";
+                                const speed = segment.metadata?.responseTime;
+                                if (speed && speed <= LEADERBOARD.VERY_FAST_THRESHOLD_MS) {
+                                    effectClass = "segment-very-fast";
+                                } else if (speed && speed <= LEADERBOARD.FAST_THRESHOLD_MS) {
+                                    effectClass = "segment-fast";
+                                }
+
+                                return (
+                                    <span
+                                        key={segment.id}
+                                        style={{ color: segment.color }}
+                                        className={`hover:bg-zinc-800/50 rounded transition-colors cursor-pointer border-b-2 border-transparent hover:border-zinc-700 ${effectClass}`}
+                                        title={`By ${players[segment.authorId]?.name || "Unknown"} (Click to edit)`}
+                                        onClick={() => setEditingSegment({ id: segment.id, text: segment.text })}
+                                    >
+                                        {segment.text}{" "}
+                                    </span>
+                                );
+                            })
                         )}
 
                         {/* Cursor for current player */}
