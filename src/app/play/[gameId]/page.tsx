@@ -263,17 +263,46 @@ function PlayerLogic() {
 
     // STATE HANDLING
 
+    const handleShare = async () => {
+        const fullStory = story.map(s => s.text).join(' ');
+        if (!fullStory) return;
+
+        try {
+            if (navigator.share) {
+                await navigator.share({
+                    title: 'One Word Story',
+                    text: fullStory,
+                });
+            } else {
+                await navigator.clipboard.writeText(fullStory);
+                alert("Story copied to clipboard!");
+            }
+        } catch (err) {
+            // Share cancelled or failed
+        }
+    };
+
     if (isEnded) {
         return (
             <div className="min-h-screen bg-black text-white p-6 flex flex-col items-center justify-center text-center animate-fade-in">
                 <h1 className="text-6xl font-serif font-bold mb-6 text-indigo-500">THE END.</h1>
-                <p className="text-zinc-400 text-lg mb-8">A masterpiece, surely.</p>
-                <button
-                    onClick={() => router.push('/')}
-                    className="bg-white text-black px-8 py-3 rounded-full font-bold hover:scale-105 transition-transform"
-                >
-                    Back to Home
-                </button>
+                <p className="text-zinc-400 text-lg mb-12">A masterpiece, surely.</p>
+
+                <div className="flex flex-col gap-4 w-full max-w-xs">
+                    <button
+                        onClick={handleShare}
+                        className="bg-indigo-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-lg flex items-center justify-center gap-2 text-lg"
+                    >
+                        <span>📤</span> Share Story
+                    </button>
+
+                    <button
+                        onClick={() => router.push('/')}
+                        className="bg-zinc-800 text-zinc-400 px-8 py-4 rounded-xl font-bold hover:bg-zinc-700 transition-all"
+                    >
+                        Back to Home
+                    </button>
+                </div>
             </div>
         );
     }

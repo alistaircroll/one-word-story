@@ -217,6 +217,16 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
     const story = gameState.story || [];
     const timeLeft = useGameTimer(gameState);
 
+    const handleCopyStory = async () => {
+        const fullStory = story.map(s => s.text).join(' ');
+        try {
+            await navigator.clipboard.writeText(fullStory);
+            alert("Story copied to clipboard!");
+        } catch (e) {
+            console.error("Copy failed", e);
+        }
+    };
+
     // Editing State
     const [showSettings, setShowSettings] = useState(false);
     const [editingSegment, setEditingSegment] = useState<{ id: string, text: string } | null>(null);
@@ -317,7 +327,14 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                 >
                     ⚙
                 </button>
-                {gameState.status === "PAUSED" ? (
+                {gameState.status === "ENDED" ? (
+                    <button
+                        onClick={handleCopyStory}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-lg font-bold text-lg shadow-lg transition-all flex items-center gap-2"
+                    >
+                        <span>📄</span> Copy Full Story
+                    </button>
+                ) : gameState.status === "PAUSED" ? (
                     <>
                         {Object.values(players).filter(p => p.isActive).length >= 2 ? (
                             <button
