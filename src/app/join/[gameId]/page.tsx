@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { gameService } from "@/services/gameService";
 import { GAME_RULES } from "@/lib/constants";
-import { get, ref, child } from "firebase/database";
+import { get, ref } from "firebase/database";
 import { db } from "@/lib/firebase";
 
 export default function JoinPage() {
@@ -48,7 +47,7 @@ export default function JoinPage() {
     }, [gameId, router]);
 
     return (
-        <div className="flex h-screen items-center justify-center bg-black text-white p-6 text-center">
+        <div className="app min-h-screen flex items-center justify-center p-6 text-center">
             <div className="animate-pulse text-xl font-mono">{status}</div>
         </div>
     );

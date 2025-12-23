@@ -29,42 +29,50 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center sm:p-24 bg-zinc-900 text-white">
-      <h1 className="text-6xl font-bold mb-4 tracking-tight">
-        One Word Story
-      </h1>
-      <p className="text-xl mb-12 text-zinc-400 max-w-lg">
-        Collaboratively write a story with your friends. One word at a time.
-      </p>
+    <main className="app min-h-screen flex flex-col p-6">
+      {/* Centered content area */}
+      <div className="flex-1 flex flex-col items-center justify-center text-center">
+        <h1 className="text-6xl font-bold mb-6" style={{ letterSpacing: '-0.02em' }}>
+          One Word Story
+        </h1>
+        <p className="text-2xl text-dim max-w-lg" style={{ marginBottom: '9rem' }}>
+          Collaboratively write a story with your friends, one word at a time.
+        </p>
 
-      <div className="flex flex-col gap-4 w-full max-w-xs">
-        <button
-          onClick={handleCreateGame}
-          disabled={isCreating}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors shadow-lg shadow-indigo-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-          type="button"
-        >
-          {isCreating ? "Creating..." : "Create New Game"}
-        </button>
-
-        <div className="flex gap-2 mt-4">
-          <input
-            type="text"
-            placeholder="Room Code"
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-            onKeyDown={(e) => e.key === "Enter" && handleJoinGame()}
-            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 uppercase tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            maxLength={6}
-          />
+        <div className="flex flex-col gap-4 w-full max-w-sm">
           <button
-            onClick={handleJoinGame}
-            className="bg-zinc-700 hover:bg-zinc-600 px-6 rounded-lg font-bold transition-colors"
+            onClick={handleCreateGame}
+            disabled={isCreating}
+            className="btn btn--primary btn--large w-full text-xl"
+            type="button"
           >
-            Join
+            {isCreating ? "Creating..." : "Create New Game"}
           </button>
+
+          <div className="flex gap-3 mt-4">
+            <input
+              type="text"
+              placeholder="Room Code"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === "Enter" && handleJoinGame()}
+              className="input flex-1 uppercase tracking-widest text-center text-lg"
+              maxLength={6}
+            />
+            <button
+              onClick={handleJoinGame}
+              className="btn btn--secondary text-lg"
+            >
+              Join
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Footer - natural flow at bottom */}
+      <footer className="text-center text-sm text-dim py-4">
+        One Word Story is a game by <a href="https://alistaircroll.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-accent transition-colors">Alistair Croll</a>.
+      </footer>
     </main>
   );
 }

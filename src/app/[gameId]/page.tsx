@@ -15,25 +15,17 @@ export default function HostGamePage() {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Initial subscription
     useEffect(() => {
         if (!gameId) return;
 
         const unsubscribe = gameService.subscribeToGame(gameId, (data) => {
             setGameState(data);
             setLoading(false);
-
-            // If data is null, game doesn't exist
-            if (data === null) {
-                // Redirect to home or show error?
-                // Ideally we check existence first, but this works
-            }
         });
 
         return () => unsubscribe();
     }, [gameId]);
 
-    // Auto-Pause Monitor
     useEffect(() => {
         if (!gameState || gameState.status !== "PLAYING") return;
 
@@ -41,35 +33,29 @@ export default function HostGamePage() {
         const activeCount = Object.values(players).filter(p => p.isActive).length;
 
         if (activeCount < GAME_RULES.MIN_PLAYERS) {
-            // We (the host) trigger the pause
             gameService.pauseGame(gameId);
         }
     }, [gameState, gameId]);
 
     if (loading) {
         return (
-            <div className="flex h-screen items-center justify-center bg-zinc-900 text-white">
-                <div className="animate-pulse">Loading game...</div>
+            <div className="app min-h-screen flex items-center justify-center">
+                <div className="animate-pulse text-lg">Loading game...</div>
             </div>
         );
     }
 
     if (!gameState) {
         return (
-            <div className="flex h-screen items-center justify-center bg-zinc-900 text-white flex-col gap-4">
-                <h1 className="text-2xl">Game Not Found</h1>
-                <p>Return to home to create a new game.</p>
-                <button
-                    onClick={() => router.push('/')}
-                    className="bg-zinc-700 px-4 py-2 rounded"
-                >
+            <div className="app min-h-screen flex flex-col items-center justify-center gap-4">
+                <h1 className="text-2xl font-bold">Game Not Found</h1>
+                <p className="text-dim">Return to home to create a new game.</p>
+                <button onClick={() => router.push('/')} className="btn btn--secondary">
                     Home
                 </button>
             </div>
         );
     }
-
-    // --- RENDERERS ---
 
     if (gameState.status === "LOBBY") {
         return <LobbyView gameId={gameId} gameState={gameState} />;
@@ -78,78 +64,64 @@ export default function HostGamePage() {
     return <GameView gameId={gameId} gameState={gameState} />;
 }
 
-// --- SUB-COMPONENTS ---
-
 function LobbyView({ gameId, gameState }: { gameId: string, gameState: GameState }) {
     const players = Object.values(gameState.players || {});
     const activePlayers = players.filter(p => p.isActive);
     const playerCount = activePlayers.length;
     const canStart = playerCount >= GAME_RULES.MIN_PLAYERS;
 
-    // Settings State
     const [showSettings, setShowSettings] = useState(false);
+    const [confirmClear, setConfirmClear] = useState(false);
 
-    // We need the full URL for the QR code
-    // In dev: http://localhost:3000/join/GAMEID
-    // We can use window.location.origin
     const [origin, setOrigin] = useState("");
     useEffect(() => {
-        setOrigin(window.location.origin);
+        setTimeout(() => setOrigin(window.location.origin), 0);
     }, []);
 
     const joinUrl = `${origin}/join/${gameId}`;
 
     return (
-        <div className="min-h-screen bg-zinc-900 text-white p-6 flex flex-col">
-            {/* Header */}
-            <header className="flex justify-between items-center mb-8 border-b border-zinc-800 pb-4">
-                <h1 className="text-2xl font-bold tracking-tight">ONE WORD STORY</h1>
-                <div className="text-zinc-400">Status: <span className="text-white font-mono">LOBBY</span></div>
+        <div className="app min-h-screen p-6 flex flex-col">
+            <header className="flex justify-between items-center mb-8 pb-4 border-b border-faint">
+                <h1 style={{ fontSize: '2.5rem', fontWeight: 700 }}>ONE WORD STORY</h1>
+                <div style={{ fontSize: '2.5rem', fontWeight: 700, color: 'var(--color-brand-blue)' }}>LOBBY</div>
             </header>
 
-            {/* Main Content */}
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-12">
-
-                {/* Left Col: Join Info */}
-                <div className="flex flex-col items-center justify-center p-8 bg-zinc-800/50 rounded-2xl border border-zinc-700/50">
-                    <div className="bg-white p-4 rounded-xl mb-6">
-                        {origin && <QRCodeSVG value={joinUrl} size={256} />}
+            <div className="flex-1 grid gap-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+                <div className="flex flex-col items-center justify-center p-8 card--pop">
+                    <div className="qr-wrapper mb-6">
+                        {origin && <QRCodeSVG value={joinUrl} size={280} />}
                     </div>
                     <div className="text-center">
-                        <p className="text-zinc-400 uppercase tracking-widest text-sm mb-2">Join at</p>
-                        <div className="text-3xl font-bold font-mono bg-zinc-950 px-6 py-3 rounded-lg border border-zinc-700 mb-4">
+                        <p className="text-lg mb-2" style={{ color: 'var(--color-ink-dim)' }}>Scan to join or visit</p>
+                        <div className="text-xl font-bold mb-4" style={{ color: 'var(--color-ink)' }}>
                             {joinUrl.replace(/^https?:\/\//, '')}
                         </div>
-
-                        <p className="text-zinc-400 uppercase tracking-widest text-sm mb-2">Room Code</p>
-                        <div className="text-6xl font-bold font-mono tracking-widest text-indigo-400">
+                        <p className="text-lg mb-2" style={{ color: 'var(--color-ink-dim)' }}>Room Code</p>
+                        <div className="text-5xl font-bold text-accent tracking-widest">
                             {gameId}
                         </div>
                     </div>
                 </div>
 
-                {/* Right Col: Players & Controls */}
                 <div className="flex flex-col">
-                    <div className="flex justify-between items-end mb-4">
-                        <h2 className="text-xl font-bold">Players</h2>
-                        <div className="text-zinc-400">
-                            {playerCount} / {GAME_RULES.MAX_PLAYERS}
+                    <div className="flex justify-between items-center mb-2">
+                        <div className="flex gap-2 items-center">
+                            <h2 className="text-xl font-bold">Players</h2>
+                            <div className="text-dim">{playerCount} / {GAME_RULES.MAX_PLAYERS}</div>
                         </div>
                     </div>
 
-                    <div className="flex-1 bg-zinc-800/30 rounded-xl p-4 mb-6 border border-zinc-700/50 min-h-[300px]">
+                    <div className="flex-1 card mb-4" style={{ minHeight: '200px' }}>
                         {playerCount === 0 ? (
-                            <div className="h-full flex items-center justify-center text-zinc-500 italic">
+                            <div className="h-full flex items-center justify-center text-dim italic">
                                 Waiting for players to join...
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 gap-3">
                                 {activePlayers.map(player => (
-                                    <div key={player.id} className="flex items-center gap-3 bg-zinc-800 p-3 rounded-lg border border-zinc-700">
-                                        <div
-                                            className="w-4 h-4 rounded-full"
-                                            style={{ backgroundColor: player.color }}
-                                        />
+                                    <div key={player.id} className="flex items-center gap-3 p-3">
+                                        <div className="player-dot" style={{ backgroundColor: player.color }} />
                                         <span className="font-bold truncate">{player.name}</span>
                                     </div>
                                 ))}
@@ -157,41 +129,59 @@ function LobbyView({ gameId, gameState }: { gameId: string, gameState: GameState
                         )}
                     </div>
 
-                    <div className="flex gap-4">
-                        {/* Settings Button */}
-                        <button
-                            onClick={() => setShowSettings(true)}
-                            className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-4 rounded-lg font-bold border border-zinc-700"
-                        >
-                            Settings ⚙
-                        </button>
+                    {playerCount > 0 && (
+                        confirmClear ? (
+                            <button
+                                onClick={() => {
+                                    gameService.clearPlayers(gameId);
+                                    setConfirmClear(false);
+                                }}
+                                className="btn btn--danger animate-pulse mb-4"
+                            >
+                                Confirm Clear?
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => {
+                                    setConfirmClear(true);
+                                    setTimeout(() => setConfirmClear(false), 3000);
+                                }}
+                                className="btn btn--ghost-danger mb-4"
+                            >
+                                Clear All Players
+                            </button>
+                        )
+                    )}
 
+                    <div className="flex gap-4">
+                        <button onClick={() => setShowSettings(true)} className="btn btn--secondary flex-1">
+                            Settings
+                        </button>
                         <button
                             onClick={() => gameService.startGame(gameId)}
-                            className={`flex-[2] py-4 rounded-lg font-bold text-lg shadow-lg transition-all ${canStart
-                                ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/20"
-                                : "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700"
-                                }`}
+                            className="btn btn--primary flex-1"
                             disabled={!canStart}
+                            title={!canStart ? "3 or more players must join to begin" : ""}
+                            style={{ flex: 2 }}
                         >
                             Start Game
                         </button>
                     </div>
                 </div>
-
             </div>
 
-            <SettingsModal
-                gameId={gameId}
-                settings={gameState.settings}
-                isOpen={showSettings}
-                onClose={() => setShowSettings(false)}
-            />
-        </div>
+            {showSettings && (
+                <SettingsModal
+                    gameId={gameId}
+                    settings={gameState.settings}
+                    isOpen={showSettings}
+                    onClose={() => setShowSettings(false)}
+                />
+            )}
+        </div >
     );
 }
 
-// Helper hook for timer (could share but keeping adjacent for now)
 function useGameTimer(gameState: GameState) {
     const [timeLeft, setTimeLeft] = useState(0);
     useEffect(() => {
@@ -201,17 +191,20 @@ function useGameTimer(gameState: GameState) {
                 const remaining = Math.max(0, (gameState.settings?.turnTimeLimit || 30) - elapsed);
                 setTimeLeft(remaining);
             };
-            tick(); // initial
+            tick();
             const interval = setInterval(tick, 500);
             return () => clearInterval(interval);
         } else {
-            setTimeLeft(0);
+            setTimeout(() => {
+                if (timeLeft !== 0) setTimeLeft(0);
+            }, 0);
         }
-    }, [gameState]);
+    }, [gameState, timeLeft]);
     return timeLeft;
 }
 
 function GameView({ gameId, gameState }: { gameId: string, gameState: GameState }) {
+    const router = useRouter();
     const players = gameState.players || {};
     const currentPlayer = gameState.currentPlayerId ? players[gameState.currentPlayerId] : null;
     const story = gameState.story || [];
@@ -227,31 +220,29 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
         }
     };
 
-    // Editing State
+    const handleNewStory = async () => {
+        const newGameId = await gameService.createGame();
+        router.push(`/${newGameId}`);
+    };
+
     const [showSettings, setShowSettings] = useState(false);
     const [editingSegment, setEditingSegment] = useState<{ id: string, text: string } | null>(null);
+    const [confirmEnd, setConfirmEnd] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
 
-    // QR Code URL
     const [origin, setOrigin] = useState("");
     useEffect(() => {
-        setOrigin(window.location.origin);
+        setTimeout(() => setOrigin(window.location.origin), 0);
     }, []);
     const joinUrl = `${origin}/join/${gameId}`;
 
-    // Auto-scroll story
     const storyEndRef = React.useRef<HTMLSpanElement>(null);
     useEffect(() => {
         storyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [story.length]);
 
-    // Auto-timeout: Skip player when timer hits 0
     const hasTimedOut = React.useRef(false);
     useEffect(() => {
-        // Only auto-skip if:
-        // 1. Game is PLAYING
-        // 2. Timer is at 0 (or very close)
-        // 3. We have a current player
-        // 4. We haven't already triggered this timeout for this turn
         if (
             gameState.status === "PLAYING" &&
             timeLeft <= 0.5 &&
@@ -261,41 +252,47 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
             hasTimedOut.current = true;
             gameService.nextTurn(gameId);
         }
-        // Reset the flag when a new turn starts (timerStartedAt changes)
         if (timeLeft > 1) {
             hasTimedOut.current = false;
         }
     }, [timeLeft, gameState.status, gameState.currentPlayerId, gameId]);
 
+    const isDanger = timeLeft < 10;
+
     return (
-        <div className="min-h-screen bg-zinc-900 text-white flex flex-col">
-            {/* Top Bar */}
-            <div className="flex justify-between items-center p-6 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-10">
-                <div className="flex items-center gap-4">
-                    <h1 className="text-xl font-bold tracking-tight text-zinc-400">ONE WORD STORY</h1>
-                    <div className="bg-zinc-800 px-3 py-1 rounded text-sm font-mono border border-zinc-700">
-                        {gameId}
+        <div className="app min-h-screen flex flex-col">
+            {/* Top Bar with QR and join info */}
+            <div className="flex justify-between items-center p-4 border-b border-faint bg-card sticky top-0 z-10">
+                <div className="flex items-center gap-6" style={{ alignItems: 'center' }}>
+                    <h1 style={{ fontSize: '1.75rem', fontWeight: 700, lineHeight: 1 }}>ONE WORD STORY</h1>
+                    {origin && (
+                        <div className="qr-inline" style={{ display: 'flex', alignItems: 'center' }}>
+                            <QRCodeSVG value={joinUrl} size={64} />
+                        </div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', fontSize: '1.125rem' }}>
+                        <span style={{ color: 'var(--color-ink-dim)' }}>Join the story:</span>
+                        <span style={{ fontWeight: 500 }}>{origin.replace(/^https?:\/\//, '')}/join/</span>
+                        <span style={{ fontWeight: 700, color: 'var(--color-brand-blue)' }}>{gameId}</span>
                     </div>
                 </div>
 
-                {/* Active Player Status */}
+                {/* Current Turn + Timer */}
                 <div className="flex items-center gap-6">
                     <div className="text-right">
-                        <div className="text-xs text-zinc-500 uppercase tracking-widest">Current Turn</div>
+                        <div className="text-xs text-dim uppercase tracking-widest">Current Turn</div>
                         {currentPlayer ? (
                             <div className="text-xl font-bold flex items-center justify-end gap-2">
-                                <span className="w-3 h-3 rounded-full" style={{ background: currentPlayer.color }}></span>
+                                <span className="player-dot" style={{ background: currentPlayer.color, width: 12, height: 12 }} />
                                 {currentPlayer.name}
                             </div>
                         ) : (
-                            <div className="text-xl font-bold text-zinc-500">
+                            <div className="text-xl font-bold text-dim">
                                 {gameState.status === "ENDED" ? "THE END" : "PAUSED"}
                             </div>
                         )}
                     </div>
-
-                    {/* Timer */}
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center border-4 text-xl font-bold font-mono ${timeLeft < 10 ? 'bg-red-900 border-red-700 animate-pulse' : 'bg-zinc-800 border-zinc-700'}`}>
+                    <div className={`timer-circle ${isDanger ? 'timer-circle--danger' : ''}`}>
                         {Math.ceil(timeLeft)}
                     </div>
                 </div>
@@ -304,18 +301,15 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
             {/* Main Content */}
             <div className="flex-1 flex">
                 {/* Story Area */}
-                <div className="flex-1 p-8 sm:p-16 max-w-5xl mx-auto w-full overflow-auto">
-                    <div className="text-4xl sm:text-5xl leading-relaxed font-serif text-zinc-300">
+                <div className="flex-1 p-8 overflow-auto" style={{ maxWidth: '100%' }}>
+                    <div className="story-text" style={{ maxWidth: '900px', margin: '0 auto' }}>
                         {story.length === 0 ? (
-                            <span className="text-zinc-700 italic">Once upon a time...</span>
+                            <span className="text-dim italic">Once upon a time...</span>
                         ) : (
                             story.map((segment) => {
-                                // Visual flair for fast responses
                                 let effectClass = "";
                                 const speed = segment.metadata?.responseTime;
-                                if (speed && speed <= LEADERBOARD.VERY_FAST_THRESHOLD_MS) {
-                                    effectClass = "segment-very-fast";
-                                } else if (speed && speed <= LEADERBOARD.FAST_THRESHOLD_MS) {
+                                if (speed && speed <= LEADERBOARD.FAST_THRESHOLD_MS) {
                                     effectClass = "segment-fast";
                                 }
 
@@ -323,7 +317,7 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                                     <span
                                         key={segment.id}
                                         style={{ color: segment.color }}
-                                        className={`hover:bg-zinc-800/50 rounded transition-colors cursor-pointer border-b-2 border-transparent hover:border-zinc-700 ${effectClass}`}
+                                        className={`story-segment ${effectClass}`}
                                         title={`By ${players[segment.authorId]?.name || "Unknown"} (Click to edit)`}
                                         onClick={() => setEditingSegment({ id: segment.id, text: segment.text })}
                                     >
@@ -332,115 +326,115 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                                 );
                             })
                         )}
-
-                        {/* Cursor for current player */}
                         {currentPlayer && (
-                            <span className="inline-block w-1 h-10 ml-1 translate-y-2 animate-pulse" style={{ backgroundColor: currentPlayer.color }} />
+                            <span className="story-cursor" style={{ backgroundColor: currentPlayer.color }} />
                         )}
                         <span ref={storyEndRef} />
                     </div>
                 </div>
 
                 {/* Leaderboard Sidebar */}
-                <div className={`hidden lg:flex flex-col p-6 bg-zinc-900 border-l border-zinc-800 w-80 shadow-xl z-20 ${gameState.status === 'LOBBY' ? 'hidden' : ''}`}>
-                    <div className="mb-6 flex-1 overflow-hidden flex flex-col">
+                {gameState.status !== 'LOBBY' && (
+                    <div className="hidden lg:flex flex-col p-6 bg-card border-l w-72 z-20">
                         <Leaderboard players={players || {}} currentPlayerId={gameState.currentPlayerId} />
-                    </div>
-
-                    {/* QR Mini Code */}
-                    <div className="border-t border-zinc-800 pt-4 flex flex-col items-center bg-zinc-900/50">
-                        <p className="text-zinc-600 text-[10px] uppercase tracking-widest mb-2">Join Code: <span className="text-indigo-400 font-bold text-sm">{gameId}</span></p>
-                        {origin && (
-                            <div className="bg-white p-1 rounded">
-                                <QRCodeSVG value={joinUrl} size={80} />
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* QR Sidebar (Only for LOBBY) */}
-                {gameState.status === "LOBBY" && (
-                    <div className="hidden lg:flex flex-col items-center justify-center p-6 bg-zinc-800/30 border-l border-zinc-800 w-80">
-                        <p className="text-zinc-500 text-xs uppercase tracking-widest mb-2">Join Game</p>
-                        {origin && (
-                            <div className="bg-white p-2 rounded-lg">
-                                <QRCodeSVG value={joinUrl} size={120} />
-                            </div>
-                        )}
-                        <p className="text-indigo-400 font-mono font-bold text-2xl mt-3">{gameId}</p>
                     </div>
                 )}
             </div>
 
             {/* Host Controls */}
-            <div className="p-6 border-t border-zinc-800 bg-zinc-900 flex justify-center gap-4">
-                <button
-                    onClick={() => setShowSettings(true)}
-                    className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-3 rounded-lg font-bold border border-zinc-700 transition-colors"
-                >
-                    ⚙
+            <div className="p-6 border-t border-faint bg-card flex justify-center gap-4">
+                <button onClick={() => setShowSettings(true)} className="btn btn--secondary">
+                    Settings
                 </button>
                 {gameState.status === "ENDED" ? (
-                    <button
-                        onClick={handleCopyStory}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-lg font-bold text-lg shadow-lg transition-all flex items-center gap-2"
-                    >
-                        <span>📄</span> Copy Full Story
-                    </button>
+                    <>
+                        <button onClick={handleCopyStory} className="btn btn--primary btn--large">
+                            Copy Full Story
+                        </button>
+                        <button onClick={handleNewStory} className="btn btn--primary btn--large">
+                            New Story
+                        </button>
+                    </>
                 ) : gameState.status === "PAUSED" ? (
                     <>
                         {Object.values(players).filter(p => p.isActive).length >= 2 ? (
                             <button
                                 onClick={() => gameService.resumeGame(gameId)}
-                                className="bg-green-600 hover:bg-green-500 text-white px-8 py-4 rounded-lg font-bold text-lg shadow-lg transition-all"
+                                className="btn btn--primary btn--large"
+                                style={{ background: 'var(--color-brand-sage)' }}
                             >
-                                ▶ Resume Game
+                                Resume Game
                             </button>
                         ) : (
-                            <div className="text-amber-500 font-bold">
+                            <div className="text-coral font-bold flex items-center">
                                 Waiting for more players to resume...
                             </div>
                         )}
                     </>
                 ) : (
-                    <button
-                        onClick={() => gameService.nextTurn(gameId)}
-                        className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-lg font-bold border border-zinc-700 transition-colors"
-                    >
-                        Skip Player
-                    </button>
+                    <>
+                        <button onClick={() => gameService.nextTurn(gameId)} className="btn btn--secondary">
+                            Skip Player
+                        </button>
+                        {confirmEnd ? (
+                            <button
+                                onClick={() => gameService.endGame(gameId)}
+                                className="btn btn--danger animate-pulse"
+                            >
+                                Confirm End?
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => {
+                                    setConfirmEnd(true);
+                                    setTimeout(() => setConfirmEnd(false), 3000);
+                                }}
+                                className="btn btn--ghost-danger"
+                            >
+                                End Story
+                            </button>
+                        )}
+                    </>
                 )}
             </div>
 
             {/* Edit Modal */}
             {editingSegment && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <div className="bg-zinc-800 p-8 rounded-xl max-w-lg w-full border border-zinc-700 shadow-2xl">
-                        <h2 className="text-xl font-bold mb-4">Edit Story Segment</h2>
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h2 className="modal__title">Edit Story Segment</h2>
                         <input
                             type="text"
                             value={editingSegment.text}
                             onChange={(e) => setEditingSegment({ ...editingSegment, text: e.target.value })}
-                            className="w-full bg-zinc-900 border border-zinc-700 rounded p-4 text-xl mb-8 focus:ring-2 focus:ring-indigo-500 outline-none font-serif text-white/90"
+                            className="input input--large mb-8 text-serif"
                             autoFocus
                         />
                         <div className="flex justify-between gap-4">
-                            <button
-                                onClick={() => {
-                                    if (confirm("Permanently delete this part of the story?")) {
+                            {confirmDelete ? (
+                                <button
+                                    onClick={() => {
                                         gameService.deleteStorySegment(gameId, editingSegment.id);
                                         setEditingSegment(null);
-                                    }
-                                }}
-                                className="bg-red-900/30 hover:bg-red-900/50 text-red-200 px-4 py-3 rounded-lg font-bold border border-red-800/50 transition-colors"
-                            >
-                                Delete
-                            </button>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setEditingSegment(null)}
-                                    className="px-6 py-3 rounded-lg font-bold hover:bg-zinc-700 text-zinc-300 transition-colors"
+                                        setConfirmDelete(false);
+                                    }}
+                                    className="btn btn--danger animate-pulse"
                                 >
+                                    Confirm Delete?
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        setConfirmDelete(true);
+                                        setTimeout(() => setConfirmDelete(false), 3000);
+                                    }}
+                                    className="btn btn--ghost-danger"
+                                >
+                                    Delete
+                                </button>
+                            )}
+                            <div className="flex gap-3">
+                                <button onClick={() => { setEditingSegment(null); setConfirmDelete(false); }} className="btn btn--ghost">
                                     Cancel
                                 </button>
                                 <button
@@ -448,7 +442,7 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                                         gameService.updateStorySegment(gameId, editingSegment.id, editingSegment.text);
                                         setEditingSegment(null);
                                     }}
-                                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-lg font-bold shadow-lg transition-colors"
+                                    className="btn btn--primary"
                                 >
                                     Save
                                 </button>
@@ -458,22 +452,20 @@ function GameView({ gameId, gameState }: { gameId: string, gameState: GameState 
                 </div>
             )}
 
-            <SettingsModal
-                gameId={gameId}
-                settings={gameState.settings}
-                isOpen={showSettings}
-                onClose={() => setShowSettings(false)}
-            />
+            {showSettings && (
+                <SettingsModal
+                    gameId={gameId}
+                    settings={gameState.settings}
+                    isOpen={showSettings}
+                    onClose={() => setShowSettings(false)}
+                />
+            )}
         </div>
     );
 }
 
-function SettingsModal({ gameId, settings, isOpen, onClose }: { gameId: string, settings: any, isOpen: boolean, onClose: () => void }) {
+function SettingsModal({ gameId, settings, isOpen, onClose }: { gameId: string, settings: GameState['settings'], isOpen: boolean, onClose: () => void }) {
     const [localSettings, setLocalSettings] = useState(settings || { wordLimit: 3, turnTimeLimit: 30 });
-
-    useEffect(() => {
-        if (isOpen && settings) setLocalSettings(settings);
-    }, [isOpen, settings]);
 
     if (!isOpen) return null;
 
@@ -481,132 +473,124 @@ function SettingsModal({ gameId, settings, isOpen, onClose }: { gameId: string, 
         gameService.updateSettings(gameId, localSettings);
         onClose();
     };
-
-    const handleClearPlayers = () => {
-        if (confirm("NUCLEAR OPTION: This will kick EVERYONE out of the game. Are you sure?")) {
-            gameService.clearPlayers(gameId);
-            onClose();
-        }
+    const adjustWordLimit = (delta: number) => {
+        const newVal = Math.max(1, Math.min(5, localSettings.wordLimit + delta));
+        setLocalSettings({ ...localSettings, wordLimit: newVal });
     };
 
-    const handleEndGame = () => {
-        if (confirm("Are you sure you want to END the story now? This cannot be undone.")) {
-            gameService.endGame(gameId);
-            onClose();
-        }
+    const adjustTimeLimit = (delta: number) => {
+        const newVal = Math.max(10, Math.min(60, localSettings.turnTimeLimit + delta));
+        setLocalSettings({ ...localSettings, turnTimeLimit: newVal });
     };
 
     return (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-            <div className="bg-zinc-800 p-8 rounded-xl max-w-lg w-full border border-zinc-700 shadow-2xl">
-                <h2 className="text-2xl font-bold mb-6 text-white border-b border-zinc-700 pb-2">Game Settings</h2>
+        <div className="modal-overlay">
+            <div className="modal" style={{ maxWidth: '450px' }}>
+                <h2 className="modal__title">Game Settings</h2>
 
-                {/* Word Limit Slider */}
-                <div className="mb-6">
-                    <label className="block text-zinc-400 mb-2">Word Limit: <span className="text-white font-bold">{localSettings.wordLimit}</span></label>
-                    <input
-                        type="range" min="1" max="5"
-                        value={localSettings.wordLimit}
-                        onChange={(e) => setLocalSettings({ ...localSettings, wordLimit: parseInt(e.target.value) })}
-                        className="w-full accent-indigo-500 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="flex justify-between text-xs text-zinc-500 mt-1">
-                        <span>1</span><span>5</span>
-                    </div>
-                </div>
-
-                {/* Turn Timer Slider */}
+                {/* Word Limit */}
                 <div className="mb-8">
-                    <label className="block text-zinc-400 mb-2">Turn Timer (Seconds): <span className="text-white font-bold">{localSettings.turnTimeLimit}s</span></label>
-                    <input
-                        type="range" min="10" max="60" step="5"
-                        value={localSettings.turnTimeLimit}
-                        onChange={(e) => setLocalSettings({ ...localSettings, turnTimeLimit: parseInt(e.target.value) })}
-                        className="w-full accent-indigo-500 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="flex justify-between text-xs text-zinc-500 mt-1">
-                        <span>10s</span><span>60s</span>
+                    <label className="block text-lg font-bold mb-4">Words Per Turn</label>
+                    <div className="slider-control">
+                        <button
+                            type="button"
+                            className="slider-control__btn"
+                            onClick={() => adjustWordLimit(-1)}
+                        >
+                            −
+                        </button>
+                        <input
+                            type="range"
+                            min="1"
+                            max="5"
+                            value={localSettings.wordLimit}
+                            onChange={(e) => setLocalSettings({ ...localSettings, wordLimit: parseInt(e.target.value) })}
+                            className="slider-control__slider"
+                        />
+                        <button
+                            type="button"
+                            className="slider-control__btn"
+                            onClick={() => adjustWordLimit(1)}
+                        >
+                            +
+                        </button>
+                        <div className="slider-control__value">{localSettings.wordLimit}</div>
                     </div>
                 </div>
 
-                {/* Dangerous Actions */}
-                <div className="flex flex-col sm:flex-row justify-between gap-4 border-t border-zinc-700 pt-6 items-center">
-                    <div className="flex flex-col gap-3 items-start">
+                {/* Turn Timer */}
+                <div className="mb-8">
+                    <label className="block text-lg font-bold mb-4">Turn Timer (Seconds)</label>
+                    <div className="slider-control">
                         <button
-                            onClick={handleEndGame}
-                            className="text-amber-500 text-sm hover:text-amber-400 font-bold"
+                            type="button"
+                            className="slider-control__btn"
+                            onClick={() => adjustTimeLimit(-5)}
                         >
-                            🛑 End Story
+                            −
                         </button>
+                        <input
+                            type="range"
+                            min="10"
+                            max="60"
+                            step="5"
+                            value={localSettings.turnTimeLimit}
+                            onChange={(e) => setLocalSettings({ ...localSettings, turnTimeLimit: parseInt(e.target.value) })}
+                            className="slider-control__slider"
+                        />
                         <button
-                            onClick={handleClearPlayers}
-                            className="text-red-500 text-sm hover:text-red-400 hover:bg-red-950/30 px-2 py-1 -ml-2 rounded"
+                            type="button"
+                            className="slider-control__btn"
+                            onClick={() => adjustTimeLimit(5)}
                         >
-                            ⚠️ Clear All Players
+                            +
                         </button>
+                        <div className="slider-control__value">{localSettings.turnTimeLimit}s</div>
                     </div>
+                </div>
 
-                    <div className="flex gap-3 w-full sm:w-auto justify-end">
-                        <button
-                            onClick={onClose}
-                            className="px-4 py-2 rounded-lg font-bold hover:bg-zinc-700 text-zinc-300 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-colors"
-                        >
-                            Save
-                        </button>
-                    </div>
+                <div className="flex gap-3 justify-end border-t border-faint pt-6 mt-6">
+                    <button onClick={onClose} className="btn btn--ghost">Cancel</button>
+                    <button onClick={handleSave} className="btn btn--primary">Save</button>
                 </div>
             </div>
         </div>
     );
 }
 
-function Leaderboard({ players, currentPlayerId }: { players: Record<string, any>, currentPlayerId: string | null }) {
+function Leaderboard({ players, currentPlayerId }: { players: NonNullable<GameState['players']>, currentPlayerId: string | null }) {
     const sortedPlayers = Object.values(players)
-        .filter((p: any) => p.isActive)
-        .sort((a: any, b: any) => {
+        .filter((p) => p.isActive)
+        .sort((a, b) => {
             const timeA = a.totalResponseTime || 0;
             const timeB = b.totalResponseTime || 0;
-            if (timeA !== timeB) return timeA - timeB; // ASC
+            if (timeA !== timeB) return timeA - timeB;
             return (a.turnCount || 0) - (b.turnCount || 0);
         });
 
     return (
-        <div className="bg-zinc-800/30 rounded-xl p-4 border border-zinc-700/50 flex flex-col h-full">
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-300">
-                <span>🏆</span> LEADERBOARD
-            </h2>
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                {sortedPlayers.map((player: any, index: number) => {
+        <div className="leaderboard flex flex-col h-full">
+            <h2 className="text-lg font-bold mb-4">Who&apos;s Fastest?</h2>
+            <div className="flex-1 overflow-y-auto flex flex-col gap-2">
+                {sortedPlayers.map((player) => {
                     const isCurrent = player.id === currentPlayerId;
                     const totalSeconds = ((player.totalResponseTime || 0) / 1000).toFixed(1);
 
                     return (
                         <div
                             key={player.id}
-                            className={`flex items-center justify-between p-2 rounded-lg border transition-all text-sm ${isCurrent
-                                ? "bg-zinc-700 border-zinc-500 shadow-md transform scale-102"
-                                : "bg-zinc-800/50 border-zinc-700/30"
-                                }`}
+                            className={`leaderboard__item ${isCurrent ? 'leaderboard__item--current' : ''}`}
                         >
-                            <div className="flex items-center gap-2 overflow-hidden">
-                                <span className="font-mono text-zinc-600 w-4 text-right text-xs">
-                                    {index + 1}.
-                                </span>
+                            <div className="flex items-center gap-3 overflow-hidden">
                                 <div
-                                    className="w-2 h-2 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: player.color }}
+                                    className="player-dot"
+                                    style={{ backgroundColor: player.color, width: 10, height: 10 }}
                                 />
-                                <span className={`truncate max-w-[100px] font-bold ${isCurrent ? "text-white" : "text-zinc-400"}`}>
+                                <span className={`truncate font-bold ${isCurrent ? '' : 'text-dim'}`} style={{ maxWidth: '120px' }}>
                                     {player.name}
                                 </span>
                             </div>
-                            <div className="font-mono text-indigo-400 font-bold text-xs">
+                            <div className="font-mono text-accent font-bold text-sm">
                                 {totalSeconds}s
                             </div>
                         </div>
